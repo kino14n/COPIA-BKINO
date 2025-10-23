@@ -6,23 +6,146 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // —————————————————————————————
-// Cabecera y configuración MySQL
+// Cabecera y configuración multi-cliente
 // —————————————————————————————
 header('Content-Type: application/json');
-$host   = 'sql200.infinityfree.com';
-$dbname = 'if0_39064130_buscador';
-$user   = 'if0_39064130';
-$pass   = 'POQ2ODdvhG';
 
-$dsn = "mysql:host=$host;port=3306;dbname=$dbname;charset=utf8";
+function respondError(string $message, int $statusCode = 400): void {
+    http_response_code($statusCode);
+    echo json_encode(['error' => $message]);
+    exit;
+}
+
+function sanitizeSlug(?string $slug): ?string {
+    if ($slug === null) {
+        return null;
+    }
+    $slug = strtolower(trim($slug));
+    if ($slug === '') {
+        return null;
+    }
+    $slug = preg_replace('/[^a-z0-9_-]/', '', $slug);
+    return $slug ?: null;
+}
+
+function detectClientSlug(): string {
+    $candidates = [];
+
+    if (isset($_REQUEST['client'])) {
+        $candidates[] = $_REQUEST['client'];
+    }
+
+    $headers = [
+        $_SERVER['HTTP_X_CLIENT']      ?? null,
+        $_SERVER['HTTP_X_CLIENT_SLUG'] ?? null,
+    ];
+    $candidates = array_merge($candidates, $headers);
+
+    $hostHeader = $_SERVER['HTTP_HOST'] ?? '';
+    if ($hostHeader !== '') {
+        $hostWithoutPort = preg_replace('/:\\d+$/', '', strtolower($hostHeader));
+        $parts = explode('.', $hostWithoutPort);
+        $hasSubdomain = count($parts) > 2 || (count($parts) === 2 && $parts[1] === 'localhost');
+        if ($hasSubdomain) {
+            $firstPart = $parts[0] === 'www' ? ($parts[1] ?? null) : $parts[0];
+            if ($firstPart) {
+                $candidates[] = $firstPart;
+            }
+        }
+    }
+
+    foreach ($candidates as $candidate) {
+        $slug = sanitizeSlug($candidate);
+        if ($slug !== null) {
+            return $slug;
+        }
+    }
+
+    respondError('Cliente no especificado o slug inválido', 400);
+}
+
+$clientSlug = detectClientSlug();
+$configPath = __DIR__ . '/clientes/' . $clientSlug . '/config.php';
+if (!is_file($configPath)) {
+    respondError('Configuración del cliente no encontrada', 404);
+}
+
+$config = require $configPath;
+if (!is_array($config)) {
+    respondError('Configuración del cliente inválida', 500);
+}
+
+$requiredKeys = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS'];
+foreach ($requiredKeys as $key) {
+    if (!array_key_exists($key, $config) || $config[$key] === '') {
+        respondError("Falta la clave obligatoria {$key} en la configuración del cliente", 500);
+    }
+}
+
+$dbCharset = $config['DB_CHARSET'] ?? 'utf8mb4';
+$dbPort    = (int)($config['DB_PORT'] ?? 3306);
+$dsn = sprintf(
+    'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+    $config['DB_HOST'],
+    $dbPort,
+    $config['DB_NAME'],
+    $dbCharset
+);
+
 try {
-    $db = new PDO($dsn, $user, $pass, [
+    $db = new PDO($dsn, $config['DB_USER'], $config['DB_PASS'], [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
 } catch (PDOException $e) {
-    echo json_encode(['error' => 'Error de conexión: '.$e->getMessage()]);
-    exit;
+    respondError('Error de conexión: ' . $e->getMessage(), 500);
+}
+
+$branding = [
+    'name'   => $config['BRAND_NAME']   ?? null,
+    'logo'   => $config['BRAND_LOGO']   ?? null,
+    'colors' => $config['BRAND_COLORS'] ?? [],
+];
+
+$uploadsRootDir   = __DIR__ . '/uploads';
+$clientUploadsDir = $uploadsRootDir . '/' . $clientSlug;
+if (!is_dir($clientUploadsDir) && !mkdir($clientUploadsDir, 0775, true) && !is_dir($clientUploadsDir)) {
+    respondError('No se pudo preparar la carpeta de archivos del cliente', 500);
+}
+
+function buildStoredUploadPath(string $filename, string $clientSlug): string
+{
+    return 'uploads/' . $clientSlug . '/' . ltrim($filename, '/');
+}
+
+function resolveUploadFullPath(?string $storedPath, string $clientSlug): ?string
+{
+    if (!$storedPath) {
+        return null;
+    }
+    if (strpos($storedPath, 'uploads/') === 0) {
+        return __DIR__ . '/' . $storedPath;
+    }
+
+    $candidate = __DIR__ . '/uploads/' . $clientSlug . '/' . ltrim($storedPath, '/');
+    if (file_exists($candidate)) {
+        return $candidate;
+    }
+
+    return __DIR__ . '/uploads/' . ltrim($storedPath, '/');
+}
+
+function normalizeDocumentPath(?string $storedPath, string $clientSlug): ?string
+{
+    if ($storedPath === null || $storedPath === '') {
+        return $storedPath;
+    }
+
+    if (strpos($storedPath, 'uploads/') === 0) {
+        return $storedPath;
+    }
+
+    return buildStoredUploadPath($storedPath, $clientSlug);
 }
 
 $action = $_REQUEST['action'] ?? '';
@@ -55,12 +178,13 @@ switch ($action) {
     $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
     $file  = $_FILES['file'];
     $filename = time().'_'.basename($file['name']);
-    if (!move_uploaded_file($file['tmp_name'], __DIR__.'/uploads/'.$filename)) {
-      echo json_encode(['error'=>'No se pudo subir el PDF']);
-      exit;
+    $storedPath  = buildStoredUploadPath($filename, $clientSlug);
+    $destination = __DIR__ . '/' . $storedPath;
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+      respondError('No se pudo subir el PDF', 500);
     }
     $db->prepare('INSERT INTO documents (name,date,path) VALUES (?,?,?)')
-       ->execute([$name,$date,$filename]);
+       ->execute([$name,$date,$storedPath]);
     $docId = $db->lastInsertId();
     $ins = $db->prepare('INSERT INTO codes (document_id,code) VALUES (?,?)');
     foreach (array_unique($codes) as $c) {
@@ -107,12 +231,12 @@ switch ($action) {
       $rows = $stmt->fetchAll();
     }
 
-    $docs = array_map(function($r){
+    $docs = array_map(function($r) use ($clientSlug){
       return [
         'id'    => (int)$r['id'],
         'name'  => $r['name'],
         'date'  => $r['date'],
-        'path'  => $r['path'],
+        'path'  => normalizeDocumentPath($r['path'], $clientSlug),
         'codes' => $r['codes'] ? explode("\n",$r['codes']) : []
       ];
     }, $rows);
@@ -153,7 +277,7 @@ switch ($action) {
           'id'    => $id,
           'name'  => $r['name'],
           'date'  => $r['date'],
-          'path'  => $r['path'],
+          'path'  => normalizeDocumentPath($r['path'], $clientSlug),
           'codes' => []
         ];
       }
@@ -188,22 +312,16 @@ switch ($action) {
 
   // —— ACCIÓN: DESCARGAR TODOS LOS PDFS EN ZIP ——  
   case 'download_pdfs':
-    $uploadsDir = __DIR__ . '/uploads';
+    $uploadsDir = $clientUploadsDir;
     if (!is_dir($uploadsDir)) {
-      echo json_encode(['error'=>'Carpeta uploads no encontrada']);
-      exit;
+      respondError('Carpeta uploads del cliente no encontrada', 404);
     }
-
-    // Cabeceras para descarga ZIP
-    header('Content-Type: application/zip');
-    header('Content-Disposition: attachment; filename="uploads_'.date('Ymd_His').'.zip"');
 
     // Crear ZIP en tmp
     $tmpFile = tempnam(sys_get_temp_dir(), 'zip');
     $zip = new ZipArchive();
     if ($zip->open($tmpFile, ZipArchive::CREATE) !== TRUE) {
-      echo json_encode(['error'=>'No se pudo crear el ZIP']);
-      exit;
+      respondError('No se pudo crear el ZIP', 500);
     }
 
     // Agregar recursivamente todos los archivos de uploads
@@ -220,6 +338,10 @@ switch ($action) {
     }
     $zip->close();
 
+    // Cabeceras para descarga ZIP
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="uploads_'.$clientSlug.'_'.date('Ymd_His').'.zip"');
+
     // Enviar contenido
     readfile($tmpFile);
     unlink($tmpFile);
@@ -234,11 +356,21 @@ switch ($action) {
     if (!empty($_FILES['file']['tmp_name'])) {
       $old = $db->prepare('SELECT path FROM documents WHERE id=?');
       $old->execute([$id]);
-      @unlink(__DIR__.'/uploads/'.$old->fetchColumn());
+      $oldPath = $old->fetchColumn();
+      if ($oldPath) {
+        $fullOldPath = resolveUploadFullPath($oldPath, $clientSlug);
+        if ($fullOldPath) {
+          @unlink($fullOldPath);
+        }
+      }
       $fn = time().'_'.basename($_FILES['file']['name']);
-      move_uploaded_file($_FILES['file']['tmp_name'], __DIR__.'/uploads/'.$fn);
+      $storedPath = buildStoredUploadPath($fn, $clientSlug);
+      $fullPath   = __DIR__ . '/' . $storedPath;
+      if (!move_uploaded_file($_FILES['file']['tmp_name'], $fullPath)) {
+        respondError('No se pudo subir el PDF actualizado', 500);
+      }
       $db->prepare('UPDATE documents SET name=?,date=?,path=? WHERE id=?')
-         ->execute([$name,$date,$fn,$id]);
+         ->execute([$name,$date,$storedPath,$id]);
     } else {
       $db->prepare('UPDATE documents SET name=?,date=? WHERE id=?')
          ->execute([$name,$date,$id]);
@@ -261,7 +393,13 @@ switch ($action) {
     $id = (int)($_GET['id'] ?? 0);
     $old = $db->prepare('SELECT path FROM documents WHERE id=?');
     $old->execute([$id]);
-    @unlink(__DIR__.'/uploads/'.$old->fetchColumn());
+    $oldPath = $old->fetchColumn();
+    if ($oldPath) {
+      $fullPath = resolveUploadFullPath($oldPath, $clientSlug);
+      if ($fullPath) {
+        @unlink($fullPath);
+      }
+    }
     $db->prepare('DELETE FROM codes WHERE document_id=?')->execute([$id]);
     $db->prepare('DELETE FROM documents WHERE id=?')->execute([$id]);
     echo json_encode(['message'=>'Documento eliminado']);
@@ -287,12 +425,12 @@ case 'search_by_code':
   $stmt->execute([$code]);
   $rows = $stmt->fetchAll();
 
-  $docs = array_map(function($r){
+  $docs = array_map(function($r) use ($clientSlug){
     return [
       'id'    => (int)$r['id'],
       'name'  => $r['name'],
       'date'  => $r['date'],
-      'path'  => $r['path'],
+      'path'  => normalizeDocumentPath($r['path'], $clientSlug),
       'codes' => $r['codes'] ? explode("\n", $r['codes']) : []
     ];
   }, $rows);
@@ -300,10 +438,9 @@ case 'search_by_code':
   echo json_encode($docs);
   break;
 
-
-
-
-
+  case 'branding':
+    echo json_encode($branding);
+    break;
 
   default:
     echo json_encode(['error'=>'Acción inválida']);
