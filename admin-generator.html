@@ -160,6 +160,103 @@
     const resetFormBtn = document.getElementById('resetForm');
     const cardTemplate = document.getElementById('clientCardTemplate');
 
+    // === MARK: Resolución dinámica de endpoints backend ===
+    const endpointBaseCandidates = [
+      new URL('.', window.location.href),
+      new URL('../', window.location.href),
+      new URL('/', window.location.href),
+    ];
+    let apiBase = null;
+    let resolvingApiBase = null;
+    let cachedInitialList = null;
+
+    async function ensureApiBase() {
+      if (apiBase) {
+        return apiBase;
+      }
+      if (resolvingApiBase) {
+        return resolvingApiBase;
+      }
+      resolvingApiBase = (async () => {
+        const visited = new Set();
+        for (const candidate of endpointBaseCandidates) {
+          const key = candidate.toString();
+          if (visited.has(key)) {
+            continue;
+          }
+          visited.add(key);
+          const testUrl = new URL('client-manager.php', candidate);
+          testUrl.searchParams.set('action', 'list');
+          try {
+            const response = await fetch(testUrl.toString(), {
+              method: 'GET',
+              headers: { Accept: 'application/json' },
+              cache: 'no-store',
+            });
+            const text = await response.text();
+            let payload;
+            try {
+              payload = text ? JSON.parse(text) : null;
+            } catch (parseError) {
+              console.debug('[admin-generator] Respuesta no JSON en', testUrl.pathname, parseError);
+              continue;
+            }
+            if (!response.ok || !payload || typeof payload !== 'object' || !('success' in payload)) {
+              continue;
+            }
+            apiBase = candidate;
+            cachedInitialList = payload;
+            return apiBase;
+          } catch (networkError) {
+            console.debug('[admin-generator] Falló candidato', testUrl.pathname, networkError);
+          }
+        }
+        throw new Error('No se pudo localizar los endpoints del backend (client-manager.php).');
+      })();
+
+      try {
+        return await resolvingApiBase;
+      } finally {
+        resolvingApiBase = null;
+      }
+    }
+
+    function buildApiUrl(path, searchParams = null) {
+      if (!apiBase) {
+        throw new Error('Backend no inicializado.');
+      }
+      const url = new URL(path, apiBase);
+      if (searchParams) {
+        Object.entries(searchParams)
+          .filter(([, value]) => value !== undefined && value !== null)
+          .forEach(([key, value]) => {
+            url.searchParams.set(key, value);
+          });
+      }
+      return url;
+    }
+
+    async function requestJson(path, options = {}) {
+      const { method = 'GET', body = null, headers = {}, searchParams = null } = options;
+      await ensureApiBase();
+      const url = buildApiUrl(path, searchParams);
+      const finalHeaders = { Accept: 'application/json', ...headers };
+      const response = await fetch(url.toString(), { method, body, headers: finalHeaders });
+      const raw = await response.text();
+      let payload;
+      try {
+        payload = raw ? JSON.parse(raw) : {};
+      } catch (parseError) {
+        console.error('[admin-generator] Respuesta inválida del backend en', url.pathname, parseError);
+        throw new Error('El backend respondió con un formato desconocido.');
+      }
+      if (!response.ok || payload.success === false) {
+        const detail = (payload && payload.error) ? payload.error : `Error ${response.status}`;
+        throw new Error(detail);
+      }
+      return payload;
+    }
+
     let slugEditedManually = false;
 
     function slugify(value) {
@@ -230,20 +327,17 @@
       formData.set('primary_color', primaryInput.value);
       formData.set('primary_hover', primaryHoverInput.value);
       try {
-        const response = await fetch('client-generator.php', {
+        const data = await requestJson('client-generator.php', {
           method: 'POST',
           body: formData,
         });
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || 'No se pudo crear el cliente');
-        }
+        cachedInitialList = null;
         renderSuccess(data);
         form.reset();
         slugEditedManually = false;
         primaryInput.value = '#F87171';
         primaryInput.dispatchEvent(new Event('input'));
-        await loadClients();
+        await loadClients({ force: true });
       } catch (error) {
         errorPanel.textContent = error.message || 'Error desconocido';
         errorPanel.classList.remove('hidden');
@@ -297,12 +391,18 @@
       resultPanel.classList.remove('hidden');
     }
 
-    async function loadClients() {
+    async function loadClients(options = {}) {
+      const { force = false } = options;
       try {
-        const response = await fetch('client-manager.php?action=list');
-        const data = await response.json();
-        if (!data.success) {
-          throw new Error(data.error || 'No se pudo obtener la lista');
+        await ensureApiBase();
+        let data;
+        if (!force && cachedInitialList) {
+          data = cachedInitialList;
+          cachedInitialList = null;
+        } else {
+          data = await requestJson('client-manager.php', {
+            searchParams: { action: 'list' },
+          });
         }
         if (!data.clients.length) {
           clientList.innerHTML = '<p class="text-slate-500">Aún no hay clientes registrados.</p>';
@@ -333,22 +433,19 @@
       const confirmSecond = prompt('Escribe ELIMINAR para confirmar:');
       if (confirmSecond !== 'ELIMINAR') return;
       try {
-        const response = await fetch('client-manager.php', {
+        await requestJson('client-manager.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({ action: 'delete', client: clientId }),
         });
-        const data = await response.json();
-        if (!data.success) {
-          throw new Error(data.error || 'No se pudo eliminar el cliente');
-        }
-        await loadClients();
+        cachedInitialList = null;
+        await loadClients({ force: true });
       } catch (error) {
         alert(error.message || 'Error al eliminar el cliente');
       }
     });
 
-    refreshClientsBtn.addEventListener('click', loadClients);
+    refreshClientsBtn.addEventListener('click', () => loadClients({ force: true }));
     form.addEventListener('submit', createClient);
 
     loadClients();
