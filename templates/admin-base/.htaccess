@@ -1,0 +1,3 @@
+RewriteEngine On
+RewriteBase /admin/__CLIENT_SLUG__/
+RewriteRule ^$ index.php [L]

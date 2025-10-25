@@ -1,0 +1,2772 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/.gitignore b/.gitignore
+index 970ec5f48ff1a55b922ef0b94ba8309ff2cd59bf..05dbe418e1896675641141b33f0bbc3aa80452b9 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,2 +1,3 @@
+ /data/documents.db
+ /uploads/
++!/uploads/.gitignore
+diff --git a/admin-generator.html b/admin-generator.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e0bb8d766fdcfe808a8353d0aa9aab2cdb74370
+--- /dev/null
++++ b/admin-generator.html
+@@ -0,0 +1,357 @@
++<!DOCTYPE html>
++<html lang="es">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++  <title>Generador de Clientes</title>
++  <script src="https://cdn.tailwindcss.com"></script>
++</head>
++<body class="bg-slate-100 min-h-screen">
++  <header class="bg-white shadow">
++    <div class="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-2">
++      <h1 class="text-3xl font-bold text-slate-800">Panel de Super Administrador</h1>
++      <p class="text-slate-600">Crea, personaliza y gestiona instancias aisladas para cada cliente.</p>
++    </div>
++  </header>
++
++  <main class="max-w-6xl mx-auto px-6 py-8 grid gap-8 lg:grid-cols-[2fr,1fr]">
++    <section class="bg-white rounded-2xl shadow p-6 space-y-6">
++      <div>
++        <h2 class="text-2xl font-semibold text-slate-800">Crear nuevo cliente</h2>
++        <p class="text-slate-500">Completa el formulario y el sistema generará automáticamente la instancia con su configuración.</p>
++      </div>
++
++      <form id="clientForm" class="space-y-6" enctype="multipart/form-data">
++        <div class="grid gap-4 md:grid-cols-2">
++          <div class="space-y-2">
++            <label class="block text-sm font-semibold text-slate-700" for="client_name">Nombre comercial</label>
++            <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="client_name" name="client_name" required placeholder="Ej: Relojería Premium" />
++          </div>
++          <div class="space-y-2">
++            <label class="block text-sm font-semibold text-slate-700" for="client_slug">ID para URL</label>
++            <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="client_slug" name="client_slug" required pattern="[a-z0-9-]+" placeholder="relojeria-premium" />
++            <p class="text-xs text-slate-500">Solo minúsculas, números y guiones.</p>
++          </div>
++        </div>
++
++        <fieldset class="border border-slate-200 rounded-xl p-4">
++          <legend class="px-2 text-sm font-semibold text-slate-700">Credenciales del Admin del cliente</legend>
++          <div class="grid gap-4 md:grid-cols-2">
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="admin_user">Usuario</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="admin_user" name="admin_user" required placeholder="admin_cliente" />
++            </div>
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="admin_pass">Contraseña</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="password" id="admin_pass" name="admin_pass" required />
++            </div>
++          </div>
++        </fieldset>
++
++        <fieldset class="border border-slate-200 rounded-xl p-4">
++          <legend class="px-2 text-sm font-semibold text-slate-700">Base de datos</legend>
++          <div class="grid gap-4 md:grid-cols-2">
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="db_host">Host</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="db_host" name="db_host" required placeholder="sql.example.com" />
++            </div>
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="db_port">Puerto</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="number" id="db_port" name="db_port" value="3306" min="1" max="65535" />
++            </div>
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="db_name">Nombre de la BD</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="db_name" name="db_name" required />
++            </div>
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="db_user">Usuario de la BD</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="db_user" name="db_user" required />
++            </div>
++            <div class="space-y-2 md:col-span-2">
++              <label class="block text-sm font-semibold text-slate-700" for="db_pass">Contraseña de la BD</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="password" id="db_pass" name="db_pass" required />
++            </div>
++          </div>
++        </fieldset>
++
++        <fieldset class="border border-slate-200 rounded-xl p-4">
++          <legend class="px-2 text-sm font-semibold text-slate-700">Branding</legend>
++          <div class="grid gap-4 md:grid-cols-2">
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="logo">Logo (PNG / SVG)</label>
++              <input class="w-full text-sm" type="file" id="logo" name="logo" accept="image/png,image/svg+xml,image/jpeg,image/webp" required />
++            </div>
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="primary_color">Color primario</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="color" id="primary_color" name="primary_color" value="#F87171" />
++              <p class="text-xs text-slate-500">El hover se calculará automáticamente.</p>
++            </div>
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="primary_hover">Color hover (20% más oscuro)</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50" type="text" id="primary_hover" name="primary_hover" readonly />
++            </div>
++            <div class="space-y-2">
++              <label class="block text-sm font-semibold text-slate-700" for="highlighter">Servicio de resaltado PDF</label>
++              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="url" id="highlighter" name="pdf_highlighter_url" placeholder="https://highlighter.railway.app/highlight" />
++            </div>
++          </div>
++        </fieldset>
++
++        <div class="flex items-center gap-4">
++          <button type="submit" class="bg-slate-900 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-slate-800 transition">Generar Cliente</button>
++          <button type="button" id="resetForm" class="text-slate-600 hover:text-slate-800 text-sm">Limpiar formulario</button>
++        </div>
++      </form>
++
++      <div id="resultPanel" class="hidden border border-green-200 bg-green-50 rounded-xl p-4"></div>
++      <div id="errorPanel" class="hidden border border-red-200 bg-red-50 rounded-xl p-4 text-red-700"></div>
++    </section>
++
++    <aside class="space-y-6">
++      <section class="bg-white rounded-2xl shadow p-6 space-y-4">
++        <div class="flex items-center justify-between">
++          <h2 class="text-xl font-semibold text-slate-800">Clientes creados</h2>
++          <button id="refreshClients" class="text-sm font-semibold text-slate-600 hover:text-slate-900">Actualizar</button>
++        </div>
++        <div id="clientList" class="space-y-4 text-sm text-slate-700">
++          <p class="text-slate-500">Aún no hay clientes registrados.</p>
++        </div>
++      </section>
++
++      <section class="bg-white rounded-2xl shadow p-6 space-y-3 text-sm text-slate-600">
++        <h3 class="text-lg font-semibold text-slate-800">Proceso automático</h3>
++        <ol class="list-decimal list-inside space-y-2">
++          <li>Generación de carpetas /clientes, /admin, /bc, /uploads.</li>
++          <li>Creación de config.php con credenciales y branding.</li>
++          <li>Copia de plantillas base para panel admin y portal público.</li>
++          <li>Hash seguro de la contraseña del administrador.</li>
++          <li>Creación de tablas <code>documents</code> y <code>codes</code> en la BD indicada.</li>
++        </ol>
++      </section>
++    </aside>
++  </main>
++
++  <template id="clientCardTemplate">
++    <div class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
++      <div class="flex items-center justify-between">
++        <div>
++          <h4 class="text-lg font-semibold text-slate-800" data-field="name"></h4>
++          <p class="text-xs uppercase tracking-wide text-slate-500">ID: <span data-field="id"></span></p>
++        </div>
++        <button data-action="delete" class="text-sm font-semibold text-red-500 hover:text-red-600">Eliminar</button>
++      </div>
++      <div class="flex flex-wrap gap-2 text-sm">
++        <a data-action="admin" target="_blank" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-700">Ir a Admin</a>
++        <a data-action="public" target="_blank" class="px-3 py-1 rounded-lg bg-slate-200 text-slate-700 font-medium hover:bg-slate-300">Ver Portal Público</a>
++      </div>
++    </div>
++  </template>
++
++  <script>
++    const form = document.getElementById('clientForm');
++    const clientNameInput = document.getElementById('client_name');
++    const slugInput = document.getElementById('client_slug');
++    const primaryInput = document.getElementById('primary_color');
++    const primaryHoverInput = document.getElementById('primary_hover');
++    const resultPanel = document.getElementById('resultPanel');
++    const errorPanel = document.getElementById('errorPanel');
++    const clientList = document.getElementById('clientList');
++    const refreshClientsBtn = document.getElementById('refreshClients');
++    const resetFormBtn = document.getElementById('resetForm');
++    const cardTemplate = document.getElementById('clientCardTemplate');
++
++    let slugEditedManually = false;
++
++    function slugify(value) {
++      return value
++        .toLowerCase()
++        .normalize('NFD')
++        .replace(/\p{Diacritic}/gu, '')
++        .replace(/[^a-z0-9-]+/g, '-')
++        .replace(/--+/g, '-')
++        .replace(/^-|-$/g, '');
++    }
++
++    function darken(hex, factor = 0.2) {
++      const normalized = hex.replace('#', '');
++      if (![3, 6].includes(normalized.length)) {
++        return hex;
++      }
++      const full = normalized.length === 3
++        ? normalized.split('').map((ch) => ch + ch).join('')
++        : normalized;
++      const r = parseInt(full.slice(0, 2), 16);
++      const g = parseInt(full.slice(2, 4), 16);
++      const b = parseInt(full.slice(4, 6), 16);
++      const adjust = (channel) => Math.max(0, Math.min(255, Math.round(channel * (1 - factor))));
++      const next = [adjust(r), adjust(g), adjust(b)].map((ch) => ch.toString(16).padStart(2, '0')).join('');
++      return `#${next}`;
++    }
++
++    function resetPanels() {
++      resultPanel.classList.add('hidden');
++      resultPanel.innerHTML = '';
++      errorPanel.classList.add('hidden');
++      errorPanel.textContent = '';
++    }
++
++    clientNameInput.addEventListener('input', () => {
++      if (slugEditedManually) {
++        return;
++      }
++      const generated = slugify(clientNameInput.value);
++      slugInput.value = generated;
++    });
++
++    slugInput.addEventListener('input', () => {
++      slugEditedManually = true;
++    });
++
++    primaryInput.addEventListener('input', () => {
++      primaryHoverInput.value = darken(primaryInput.value || '#000000');
++      primaryHoverInput.style.background = primaryHoverInput.value;
++      primaryHoverInput.style.color = '#fff';
++    });
++    primaryInput.dispatchEvent(new Event('input'));
++
++    resetFormBtn.addEventListener('click', () => {
++      form.reset();
++      slugEditedManually = false;
++      primaryInput.value = '#F87171';
++      primaryInput.dispatchEvent(new Event('input'));
++      resetPanels();
++    });
++
++    async function createClient(event) {
++      event.preventDefault();
++      resetPanels();
++      const formData = new FormData(form);
++      formData.set('client_slug', slugify(formData.get('client_slug')));
++      formData.set('primary_color', primaryInput.value);
++      formData.set('primary_hover', primaryHoverInput.value);
++      try {
++        const response = await fetch('client-generator.php', {
++          method: 'POST',
++          body: formData,
++        });
++        const data = await response.json();
++        if (!response.ok || !data.success) {
++          throw new Error(data.error || 'No se pudo crear el cliente');
++        }
++        renderSuccess(data);
++        form.reset();
++        slugEditedManually = false;
++        primaryInput.value = '#F87171';
++        primaryInput.dispatchEvent(new Event('input'));
++        await loadClients();
++      } catch (error) {
++        errorPanel.textContent = error.message || 'Error desconocido';
++        errorPanel.classList.remove('hidden');
++      }
++    }
++
++    function renderSuccess(data) {
++      const info = data.client || {};
++      const admin = data.admin || {};
++      const database = data.database || {};
++      const status = data.status || {};
++      const branding = data.branding || {};
++
++      resultPanel.innerHTML = `
++        <div class="space-y-4">
++          <div>
++            <h3 class="text-lg font-semibold text-green-700">✅ Cliente "${info.name}" creado exitosamente</h3>
++          </div>
++          <div class="grid gap-4 md:grid-cols-2">
++            <div>
++              <h4 class="font-semibold text-slate-800 mb-1">🔐 Acceso Admin</h4>
++              <p class="text-sm text-slate-600">URL: <a href="${admin.url}" target="_blank" class="text-slate-900 underline">${admin.url}</a></p>
++              <p class="text-sm text-slate-600">Usuario: <span class="font-mono">${admin.user}</span></p>
++              <p class="text-sm text-slate-600">Contraseña: <span class="font-mono">${admin.password_hint}</span></p>
++            </div>
++            <div>
++              <h4 class="font-semibold text-slate-800 mb-1">🌐 Portal Público</h4>
++              <p class="text-sm text-slate-600">URL: <a href="${info.public_url}" target="_blank" class="text-slate-900 underline">${info.public_url}</a></p>
++            </div>
++          </div>
++          <div class="grid gap-4 md:grid-cols-2">
++            <div>
++              <h4 class="font-semibold text-slate-800 mb-1">💾 Base de Datos</h4>
++              <ul class="text-sm text-slate-600 space-y-1">
++                <li>Host: <span class="font-mono">${database.host}</span></li>
++                <li>BD: <span class="font-mono">${database.name}</span></li>
++                <li>Usuario: <span class="font-mono">${database.user}</span></li>
++              </ul>
++            </div>
++            <div>
++              <h4 class="font-semibold text-slate-800 mb-1">📊 Estado</h4>
++              <ul class="text-sm text-slate-600 space-y-1">
++                <li>Tablas creadas: ${status.tables ? '✓' : '⚠️'}</li>
++                <li>Estructura: ${status.structure ? '✓' : '⚠️'}</li>
++                <li>Logo: ${branding.logo_saved ? '✓' : '⚠️'}</li>
++              </ul>
++            </div>
++          </div>
++        </div>
++      `;
++      resultPanel.classList.remove('hidden');
++    }
++
++    async function loadClients() {
++      try {
++        const response = await fetch('client-manager.php?action=list');
++        const data = await response.json();
++        if (!data.success) {
++          throw new Error(data.error || 'No se pudo obtener la lista');
++        }
++        if (!data.clients.length) {
++          clientList.innerHTML = '<p class="text-slate-500">Aún no hay clientes registrados.</p>';
++          return;
++        }
++        clientList.innerHTML = '';
++        data.clients.forEach((client) => {
++          const fragment = document.importNode(cardTemplate.content, true);
++          fragment.querySelector('[data-field="name"]').textContent = client.name;
++          fragment.querySelector('[data-field="id"]').textContent = client.id;
++          fragment.querySelector('[data-action="admin"]').href = client.admin_url;
++          fragment.querySelector('[data-action="public"]').href = client.public_url;
++          fragment.querySelector('[data-action="delete"]').dataset.clientId = client.id;
++          clientList.appendChild(fragment);
++        });
++      } catch (error) {
++        clientList.innerHTML = `<p class="text-red-600">${error.message}</p>`;
++      }
++    }
++
++    clientList.addEventListener('click', async (event) => {
++      const button = event.target.closest('button[data-action="delete"]');
++      if (!button) return;
++      const clientId = button.dataset.clientId;
++      if (!clientId) return;
++      const confirmFirst = confirm(`¿Eliminar el cliente "${clientId}"?`);
++      if (!confirmFirst) return;
++      const confirmSecond = prompt('Escribe ELIMINAR para confirmar:');
++      if (confirmSecond !== 'ELIMINAR') return;
++      try {
++        const response = await fetch('client-manager.php', {
++          method: 'POST',
++          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
++          body: new URLSearchParams({ action: 'delete', client: clientId }),
++        });
++        const data = await response.json();
++        if (!data.success) {
++          throw new Error(data.error || 'No se pudo eliminar el cliente');
++        }
++        await loadClients();
++      } catch (error) {
++        alert(error.message || 'Error al eliminar el cliente');
++      }
++    });
++
++    refreshClientsBtn.addEventListener('click', loadClients);
++    form.addEventListener('submit', createClient);
++
++    loadClients();
++  </script>
++</body>
++</html>
+diff --git a/admin/.gitignore b/admin/.gitignore
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6b7ef32c8478a48c3994dcadc86837f4371184d
+--- /dev/null
++++ b/admin/.gitignore
+@@ -0,0 +1,2 @@
++*
++!.gitignore
+diff --git a/api.php b/api.php
+index e1460bd3511b2378bb8ba94ce4c3f8fa501a2b8d..8c9cdf9274c442124fb0844e6470fc2aec8cad31 100644
+--- a/api.php
++++ b/api.php
+@@ -1,448 +1,572 @@
+-<?php 
+-// api.php
++<?php
++declare(strict_types=1);
+ 
+-ini_set('display_errors', 1);
+-ini_set('display_startup_errors', 1);
++ini_set('display_errors', '1');
++ini_set('display_startup_errors', '1');
+ error_reporting(E_ALL);
+ 
+-// —————————————————————————————
+-// Cabecera y configuración multi-cliente
+-// —————————————————————————————
+ header('Content-Type: application/json');
++session_start();
+ 
+-function respondError(string $message, int $statusCode = 400): void {
++if (!function_exists('str_starts_with')) {
++    function str_starts_with(string $haystack, string $needle): bool
++    {
++        return $needle === '' || strncmp($haystack, $needle, strlen($needle)) === 0;
++    }
++}
++
++function respondError(string $message, int $statusCode = 400): void
++{
+     http_response_code($statusCode);
+-    echo json_encode(['error' => $message]);
++    echo json_encode(['error' => $message], JSON_UNESCAPED_UNICODE);
+     exit;
+ }
+ 
+-function sanitizeSlug(?string $slug): ?string {
++function sanitizeSlug(?string $slug): ?string
++{
+     if ($slug === null) {
+         return null;
+     }
+     $slug = strtolower(trim($slug));
+     if ($slug === '') {
+         return null;
+     }
+     $slug = preg_replace('/[^a-z0-9_-]/', '', $slug);
+     return $slug ?: null;
+ }
+ 
+-function detectClientSlug(): string {
++function detectClientSlug(): string
++{
+     $candidates = [];
+ 
+     if (isset($_REQUEST['client'])) {
+         $candidates[] = $_REQUEST['client'];
+     }
+ 
+     $headers = [
+-        $_SERVER['HTTP_X_CLIENT']      ?? null,
++        $_SERVER['HTTP_X_CLIENT'] ?? null,
+         $_SERVER['HTTP_X_CLIENT_SLUG'] ?? null,
+     ];
+     $candidates = array_merge($candidates, $headers);
+ 
+     $hostHeader = $_SERVER['HTTP_HOST'] ?? '';
+     if ($hostHeader !== '') {
+         $hostWithoutPort = preg_replace('/:\\d+$/', '', strtolower($hostHeader));
+         $parts = explode('.', $hostWithoutPort);
+         $hasSubdomain = count($parts) > 2 || (count($parts) === 2 && $parts[1] === 'localhost');
+         if ($hasSubdomain) {
+             $firstPart = $parts[0] === 'www' ? ($parts[1] ?? null) : $parts[0];
+             if ($firstPart) {
+                 $candidates[] = $firstPart;
+             }
+         }
+     }
+ 
+     foreach ($candidates as $candidate) {
+         $slug = sanitizeSlug($candidate);
+         if ($slug !== null) {
+             return $slug;
+         }
+     }
+ 
+     respondError('Cliente no especificado o slug inválido', 400);
+ }
+ 
++function arrayAccessible(mixed $value): bool
++{
++    return is_array($value) || $value instanceof ArrayAccess;
++}
++
+ $clientSlug = detectClientSlug();
+ $configPath = __DIR__ . '/clientes/' . $clientSlug . '/config.php';
+ if (!is_file($configPath)) {
+     respondError('Configuración del cliente no encontrada', 404);
+ }
+ 
+ $config = require $configPath;
+-if (!is_array($config)) {
++if (!arrayAccessible($config)) {
+     respondError('Configuración del cliente inválida', 500);
+ }
+ 
+-$requiredKeys = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS'];
+-foreach ($requiredKeys as $key) {
+-    if (!array_key_exists($key, $config) || $config[$key] === '') {
+-        respondError("Falta la clave obligatoria {$key} en la configuración del cliente", 500);
++$dbConfig = [];
++if (isset($config['db']) && arrayAccessible($config['db'])) {
++    $dbConfig = $config['db'];
++} else {
++    $dbConfig = [
++        'host'    => $config['DB_HOST'] ?? null,
++        'port'    => $config['DB_PORT'] ?? null,
++        'dbname'  => $config['DB_NAME'] ?? null,
++        'user'    => $config['DB_USER'] ?? null,
++        'pass'    => $config['DB_PASS'] ?? null,
++        'charset' => $config['DB_CHARSET'] ?? null,
++    ];
++}
++
++foreach (['host', 'dbname', 'user', 'pass'] as $requiredKey) {
++    if (!isset($dbConfig[$requiredKey]) || $dbConfig[$requiredKey] === '') {
++        respondError('Falta la configuración de base de datos: ' . $requiredKey, 500);
+     }
+ }
+ 
+-$dbCharset = $config['DB_CHARSET'] ?? 'utf8mb4';
+-$dbPort    = (int)($config['DB_PORT'] ?? 3306);
++$dbCharset = $dbConfig['charset'] ?? 'utf8mb4';
++$dbPort    = (int)($dbConfig['port'] ?? 3306);
+ $dsn = sprintf(
+     'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+-    $config['DB_HOST'],
++    $dbConfig['host'],
+     $dbPort,
+-    $config['DB_NAME'],
++    $dbConfig['dbname'],
+     $dbCharset
+ );
+ 
+ try {
+-    $db = new PDO($dsn, $config['DB_USER'], $config['DB_PASS'], [
++    $db = new PDO($dsn, (string)$dbConfig['user'], (string)$dbConfig['pass'], [
+         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+     ]);
+ } catch (PDOException $e) {
+     respondError('Error de conexión: ' . $e->getMessage(), 500);
+ }
+ 
++$brandingSource = $config['branding'] ?? $config['BRANDING'] ?? [];
++if (!arrayAccessible($brandingSource)) {
++    $brandingSource = [];
++}
++
++$brandingColors = $brandingSource['colors'] ?? $config['BRAND_COLORS'] ?? [];
++if (!arrayAccessible($brandingColors)) {
++    $brandingColors = [];
++}
++
+ $branding = [
+-    'name'   => $config['BRAND_NAME']   ?? null,
+-    'logo'   => $config['BRAND_LOGO']   ?? null,
+-    'colors' => $config['BRAND_COLORS'] ?? [],
++    'name'   => $brandingSource['client_name'] ?? $brandingSource['name'] ?? $config['BRAND_NAME'] ?? null,
++    'logo'   => $brandingSource['logo_path'] ?? $brandingSource['logo'] ?? $config['BRAND_LOGO'] ?? null,
++    'colors' => $brandingColors,
+ ];
+ 
++$adminSource = $config['admin'] ?? [];
++if (!arrayAccessible($adminSource)) {
++    $adminSource = [];
++}
++
++$adminUser      = $adminSource['user'] ?? $config['ADMIN_USER'] ?? null;
++$adminPassHash  = $adminSource['pass_hash'] ?? $config['ADMIN_PASS_HASH'] ?? null;
++$adminPassPlain = $adminSource['pass_plain'] ?? $config['ADMIN_PASS'] ?? null;
++
++$pdfHighlighterUrl = $config['pdf_highlighter_url'] ?? $config['PDF_HIGHLIGHTER_URL'] ?? null;
++if ($pdfHighlighterUrl) {
++    $branding['pdf_highlighter_url'] = $pdfHighlighterUrl;
++}
++
+ $uploadsRootDir   = __DIR__ . '/uploads';
+ $clientUploadsDir = $uploadsRootDir . '/' . $clientSlug;
+ if (!is_dir($clientUploadsDir) && !mkdir($clientUploadsDir, 0775, true) && !is_dir($clientUploadsDir)) {
+     respondError('No se pudo preparar la carpeta de archivos del cliente', 500);
+ }
+ 
+ function buildStoredUploadPath(string $filename, string $clientSlug): string
+ {
+     return 'uploads/' . $clientSlug . '/' . ltrim($filename, '/');
+ }
+ 
+ function resolveUploadFullPath(?string $storedPath, string $clientSlug): ?string
+ {
+     if (!$storedPath) {
+         return null;
+     }
+-    if (strpos($storedPath, 'uploads/') === 0) {
++    if (str_starts_with($storedPath, 'uploads/')) {
+         return __DIR__ . '/' . $storedPath;
+     }
+ 
+     $candidate = __DIR__ . '/uploads/' . $clientSlug . '/' . ltrim($storedPath, '/');
+     if (file_exists($candidate)) {
+         return $candidate;
+     }
+ 
+-    return __DIR__ . '/uploads/' . ltrim($storedPath, '/');
++    $fallback = __DIR__ . '/uploads/' . ltrim($storedPath, '/');
++    return file_exists($fallback) ? $fallback : null;
+ }
+ 
+ function normalizeDocumentPath(?string $storedPath, string $clientSlug): ?string
+ {
+     if ($storedPath === null || $storedPath === '') {
+         return $storedPath;
+     }
+ 
+-    if (strpos($storedPath, 'uploads/') === 0) {
++    if (str_starts_with($storedPath, 'uploads/')) {
+         return $storedPath;
+     }
+ 
+     return buildStoredUploadPath($storedPath, $clientSlug);
+ }
+ 
++function isAdminSessionValid(string $clientSlug): bool
++{
++    return isset($_SESSION['user_logged_in'], $_SESSION['client_id'])
++        && $_SESSION['user_logged_in'] === true
++        && $_SESSION['client_id'] === $clientSlug;
++}
++
++function requireAdminSession(string $clientSlug): void
++{
++    if (!isAdminSessionValid($clientSlug)) {
++        respondError('No autorizado', 401);
++    }
++}
++
+ $action = $_REQUEST['action'] ?? '';
++$adminOnlyActions = ['upload', 'list', 'edit', 'delete', 'download_pdfs', 'highlight_pdf'];
++if (in_array($action, $adminOnlyActions, true)) {
++    requireAdminSession($clientSlug);
++}
+ 
+ switch ($action) {
++    case 'login':
++        $user = trim($_POST['user'] ?? '');
++        $pass = (string)($_POST['pass'] ?? '');
+ 
+-  // —— AUTOCOMPLETE SUGGEST ——  
+-  case 'suggest':
+-    $term = trim($_GET['term'] ?? '');
+-    if ($term === '') {
+-      echo json_encode([]);
+-      exit;
+-    }
+-    $stmt = $db->prepare("
+-      SELECT DISTINCT code 
+-      FROM codes 
+-      WHERE code LIKE ? 
+-      ORDER BY code ASC 
+-      LIMIT 10
+-    ");
+-    $stmt->execute([$term . '%']);
+-    $codes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+-    echo json_encode($codes);
+-    break;
+-
+-  // —— SUBIR NUEVO DOCUMENTO ——  
+-  case 'upload':
+-    $name  = $_POST['name'];
+-    $date  = $_POST['date'];
+-    $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
+-    $file  = $_FILES['file'];
+-    $filename = time().'_'.basename($file['name']);
+-    $storedPath  = buildStoredUploadPath($filename, $clientSlug);
+-    $destination = __DIR__ . '/' . $storedPath;
+-    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+-      respondError('No se pudo subir el PDF', 500);
+-    }
+-    $db->prepare('INSERT INTO documents (name,date,path) VALUES (?,?,?)')
+-       ->execute([$name,$date,$storedPath]);
+-    $docId = $db->lastInsertId();
+-    $ins = $db->prepare('INSERT INTO codes (document_id,code) VALUES (?,?)');
+-    foreach (array_unique($codes) as $c) {
+-      $ins->execute([$docId,$c]);
+-    }
+-    echo json_encode(['message'=>'Documento guardado']);
+-    break;
+-
+-  // —— LISTAR CON PAGINACIÓN ——  
+-  case 'list':
+-    $page    = max(1,(int)($_GET['page'] ?? 1));
+-    $perPage = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 50;
+-    $total   = (int)$db->query("SELECT COUNT(*) FROM documents")->fetchColumn();
+-
+-    if ($perPage === 0) {
+-      $stmt = $db->query("
+-        SELECT d.id,d.name,d.date,d.path,
+-               GROUP_CONCAT(c.code SEPARATOR '\n') AS codes
+-        FROM documents d
+-        LEFT JOIN codes c ON d.id=c.document_id
+-        GROUP BY d.id
+-        ORDER BY d.date DESC
+-      ");
+-      $rows = $stmt->fetchAll();
+-      $lastPage = 1;
+-      $page = 1;
+-    } else {
+-      $perPage = max(1, min(50, $perPage));
+-      $offset  = ($page - 1) * $perPage;
+-      $lastPage = (int)ceil($total / $perPage);
+-
+-      $stmt = $db->prepare("
+-        SELECT d.id,d.name,d.date,d.path,
+-               GROUP_CONCAT(c.code SEPARATOR '\n') AS codes
+-        FROM documents d
+-        LEFT JOIN codes c ON d.id=c.document_id
+-        GROUP BY d.id
+-        ORDER BY d.date DESC
+-        LIMIT :l OFFSET :o
+-      ");
+-      $stmt->bindValue(':l',$perPage,PDO::PARAM_INT);
+-      $stmt->bindValue(':o',$offset ,PDO::PARAM_INT);
+-      $stmt->execute();
+-      $rows = $stmt->fetchAll();
+-    }
++        if ($adminUser === null || $adminUser === '') {
++            respondError('Login no configurado para este cliente', 500);
++        }
+ 
+-    $docs = array_map(function($r) use ($clientSlug){
+-      return [
+-        'id'    => (int)$r['id'],
+-        'name'  => $r['name'],
+-        'date'  => $r['date'],
+-        'path'  => normalizeDocumentPath($r['path'], $clientSlug),
+-        'codes' => $r['codes'] ? explode("\n",$r['codes']) : []
+-      ];
+-    }, $rows);
+-
+-    echo json_encode([
+-      'total'     => $total,
+-      'page'      => $page,
+-      'per_page'  => $perPage,
+-      'last_page' => $lastPage,
+-      'data'      => $docs
+-    ]);
+-    break;
+-
+-  // —— BÚSQUEDA INTELIGENTE VORAZ ——  
+-  case 'search':
+-    $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
+-    if (empty($codes)) {
+-      echo json_encode([]);
+-      exit;
+-    }
++        if ($user === '' || $pass === '') {
++            respondError('Credenciales incompletas', 400);
++        }
+ 
+-   // Usar UPPER para insensibilidad a mayúsculas/minúsculas
+-  $cond = implode(" OR ", array_fill(0, count($codes), "UPPER(c.code) = UPPER(?)"));
+-  $stmt = $db->prepare("
+-    SELECT d.id,d.name,d.date,d.path,c.code
+-    FROM documents d
+-    JOIN codes c ON d.id=c.document_id
+-    WHERE $cond
+-  ");
+-  $stmt->execute($codes);
+-  $rows = $stmt->fetchAll();
+-
+-    $docs = [];
+-    foreach ($rows as $r) {
+-      $id = (int)$r['id'];
+-      if (!isset($docs[$id])) {
+-        $docs[$id] = [
+-          'id'    => $id,
+-          'name'  => $r['name'],
+-          'date'  => $r['date'],
+-          'path'  => normalizeDocumentPath($r['path'], $clientSlug),
+-          'codes' => []
+-        ];
+-      }
+-      if (!in_array($r['code'], $docs[$id]['codes'], true)) {
+-        $docs[$id]['codes'][] = $r['code'];
+-      }
+-    }
++        if (!hash_equals($adminUser, $user)) {
++            respondError('Credenciales inválidas', 401);
++        }
+ 
+-    $remaining = $codes;
+-    $selected  = [];
+-    while ($remaining) {
+-      $best      = null;
+-      $bestCover = [];
+-      foreach ($docs as $d) {
+-        $cover = array_intersect($d['codes'], $remaining);
+-        if (!$best
+-            || count($cover) > count($bestCover)
+-            || (count($cover) === count($bestCover) && $d['date'] > $best['date'])
+-        ) {
+-          $best      = $d;
+-          $bestCover = $cover;
++        $authenticated = false;
++        if ($adminPassHash && password_verify($pass, $adminPassHash)) {
++            $authenticated = true;
++        }
++        if (!$authenticated && $adminPassPlain !== null) {
++            $authenticated = hash_equals($adminPassPlain, $pass);
++        }
++        if (!$authenticated) {
++            respondError('Credenciales inválidas', 401);
+         }
+-      }
+-      if (!$best || empty($bestCover)) break;
+-      $selected[] = $best;
+-      $remaining = array_diff($remaining, $bestCover);
+-      unset($docs[$best['id']]);
+-    }
+ 
+-    echo json_encode(array_values($selected));
+-    break;
++        session_regenerate_id(true);
++        $_SESSION['user_logged_in'] = true;
++        $_SESSION['client_id']     = $clientSlug;
++        $_SESSION['username']      = $adminUser;
++
++        echo json_encode([
++            'success'  => true,
++            'user'     => $adminUser,
++            'branding' => $branding,
++        ]);
++        break;
++
++    case 'logout':
++        $_SESSION = [];
++        if (session_status() === PHP_SESSION_ACTIVE) {
++            session_destroy();
++        }
++        echo json_encode(['success' => true]);
++        break;
++
++    case 'session':
++        echo json_encode([
++            'logged_in' => isAdminSessionValid($clientSlug),
++            'user'      => $_SESSION['username'] ?? null,
++        ]);
++        break;
++
++    case 'suggest':
++        $term = trim($_GET['term'] ?? '');
++        if ($term === '') {
++            echo json_encode([]);
++            break;
++        }
+ 
+-  // —— ACCIÓN: DESCARGAR TODOS LOS PDFS EN ZIP ——  
+-  case 'download_pdfs':
+-    $uploadsDir = $clientUploadsDir;
+-    if (!is_dir($uploadsDir)) {
+-      respondError('Carpeta uploads del cliente no encontrada', 404);
+-    }
++        $stmt = $db->prepare(
++            'SELECT DISTINCT code FROM codes WHERE code LIKE ? ORDER BY code ASC LIMIT 10'
++        );
++        $stmt->execute([$term . '%']);
++        $codes = $stmt->fetchAll(PDO::FETCH_COLUMN);
++        echo json_encode($codes);
++        break;
++
++    case 'upload':
++        $name  = $_POST['name'] ?? '';
++        $date  = $_POST['date'] ?? '';
++        $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
++        $file  = $_FILES['file'] ?? null;
++
++        if (!$name || !$date || !$file) {
++            respondError('Faltan datos obligatorios para subir el documento');
++        }
+ 
+-    // Crear ZIP en tmp
+-    $tmpFile = tempnam(sys_get_temp_dir(), 'zip');
+-    $zip = new ZipArchive();
+-    if ($zip->open($tmpFile, ZipArchive::CREATE) !== TRUE) {
+-      respondError('No se pudo crear el ZIP', 500);
+-    }
++        $filename   = time() . '_' . basename($file['name']);
++        $storedPath = buildStoredUploadPath($filename, $clientSlug);
++        $destination = __DIR__ . '/' . $storedPath;
++        if (!move_uploaded_file($file['tmp_name'], $destination)) {
++            respondError('No se pudo subir el PDF', 500);
++        }
+ 
+-    // Agregar recursivamente todos los archivos de uploads
+-    $files = new RecursiveIteratorIterator(
+-      new RecursiveDirectoryIterator($uploadsDir),
+-      RecursiveIteratorIterator::LEAVES_ONLY
+-    );
+-    foreach ($files as $file) {
+-      if (!$file->isDir()) {
+-        $filePath     = $file->getRealPath();
+-        $relativePath = substr($filePath, strlen($uploadsDir) + 1);
+-        $zip->addFile($filePath, $relativePath);
+-      }
+-    }
+-    $zip->close();
++        $db->prepare('INSERT INTO documents (name, date, path) VALUES (?,?,?)')
++            ->execute([$name, $date, $storedPath]);
++        $docId = (int)$db->lastInsertId();
+ 
+-    // Cabeceras para descarga ZIP
+-    header('Content-Type: application/zip');
+-    header('Content-Disposition: attachment; filename="uploads_'.$clientSlug.'_'.date('Ymd_His').'.zip"');
++        $ins = $db->prepare('INSERT INTO codes (document_id, code) VALUES (?, ?)');
++        foreach (array_unique($codes) as $c) {
++            $ins->execute([$docId, $c]);
++        }
+ 
+-    // Enviar contenido
+-    readfile($tmpFile);
+-    unlink($tmpFile);
+-    exit;
++        echo json_encode(['message' => 'Documento guardado']);
++        break;
++
++    case 'list':
++        $page    = max(1, (int)($_GET['page'] ?? 1));
++        $perPage = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 50;
++        $total   = (int)$db->query('SELECT COUNT(*) FROM documents')->fetchColumn();
++
++        if ($perPage === 0) {
++            $stmt = $db->query(
++                'SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c.code SEPARATOR "\n") AS codes
++                 FROM documents d
++                 LEFT JOIN codes c ON d.id = c.document_id
++                 GROUP BY d.id
++                 ORDER BY d.date DESC'
++            );
++            $rows = $stmt->fetchAll();
++            $lastPage = 1;
++            $page     = 1;
++        } else {
++            $perPage = max(1, min(50, $perPage));
++            $offset  = ($page - 1) * $perPage;
++            $lastPage = (int)ceil($total / $perPage);
++
++            $stmt = $db->prepare(
++                'SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c.code SEPARATOR "\n") AS codes
++                 FROM documents d
++                 LEFT JOIN codes c ON d.id = c.document_id
++                 GROUP BY d.id
++                 ORDER BY d.date DESC
++                 LIMIT :l OFFSET :o'
++            );
++            $stmt->bindValue(':l', $perPage, PDO::PARAM_INT);
++            $stmt->bindValue(':o', $offset, PDO::PARAM_INT);
++            $stmt->execute();
++            $rows = $stmt->fetchAll();
++        }
+ 
+-  // —— EDITAR DOCUMENTO ——  
+-  case 'edit':
+-    $id   = (int)$_POST['id'];
+-    $name = $_POST['name'];
+-    $date = $_POST['date'];
+-    $codes= array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
+-    if (!empty($_FILES['file']['tmp_name'])) {
+-      $old = $db->prepare('SELECT path FROM documents WHERE id=?');
+-      $old->execute([$id]);
+-      $oldPath = $old->fetchColumn();
+-      if ($oldPath) {
+-        $fullOldPath = resolveUploadFullPath($oldPath, $clientSlug);
+-        if ($fullOldPath) {
+-          @unlink($fullOldPath);
++        $docs = array_map(
++            function (array $r) use ($clientSlug) {
++                return [
++                    'id'    => (int)$r['id'],
++                    'name'  => $r['name'],
++                    'date'  => $r['date'],
++                    'path'  => normalizeDocumentPath($r['path'], $clientSlug),
++                    'codes' => $r['codes'] ? explode("\n", $r['codes']) : [],
++                ];
++            },
++            $rows
++        );
++
++        echo json_encode([
++            'total'     => $total,
++            'page'      => $page,
++            'per_page'  => $perPage,
++            'last_page' => $lastPage,
++            'data'      => $docs,
++        ]);
++        break;
++
++    case 'search':
++        $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
++        if (empty($codes)) {
++            echo json_encode([]);
++            break;
+         }
+-      }
+-      $fn = time().'_'.basename($_FILES['file']['name']);
+-      $storedPath = buildStoredUploadPath($fn, $clientSlug);
+-      $fullPath   = __DIR__ . '/' . $storedPath;
+-      if (!move_uploaded_file($_FILES['file']['tmp_name'], $fullPath)) {
+-        respondError('No se pudo subir el PDF actualizado', 500);
+-      }
+-      $db->prepare('UPDATE documents SET name=?,date=?,path=? WHERE id=?')
+-         ->execute([$name,$date,$storedPath,$id]);
+-    } else {
+-      $db->prepare('UPDATE documents SET name=?,date=? WHERE id=?')
+-         ->execute([$name,$date,$id]);
+-    }
+-    $db->prepare('DELETE FROM codes WHERE document_id=?')->execute([$id]);
+-    $ins = $db->prepare('INSERT INTO codes (document_id,code) VALUES (?,?)');
+-    foreach (array_unique($codes) as $c) {
+-      $ins->execute([$id,$c]);
+-    }
+-    echo json_encode(['message'=>'Documento actualizado']);
+-    break;
+ 
+-    if (!$id || !$name || !$date) {
+-  echo json_encode(['error' => 'Faltan campos obligatorios']);
+-  exit;
+-}
++        $placeholders = implode(' OR ', array_fill(0, count($codes), 'UPPER(c.code) = UPPER(?)'));
++        $stmt = $db->prepare(
++            "SELECT d.id, d.name, d.date, d.path, c.code
++             FROM documents d
++             JOIN codes c ON d.id = c.document_id
++             WHERE $placeholders"
++        );
++        $stmt->execute($codes);
++        $rows = $stmt->fetchAll();
++
++        $docs = [];
++        foreach ($rows as $r) {
++            $id = (int)$r['id'];
++            if (!isset($docs[$id])) {
++                $docs[$id] = [
++                    'id'    => $id,
++                    'name'  => $r['name'],
++                    'date'  => $r['date'],
++                    'path'  => normalizeDocumentPath($r['path'], $clientSlug),
++                    'codes' => [],
++                ];
++            }
++            if (!in_array($r['code'], $docs[$id]['codes'], true)) {
++                $docs[$id]['codes'][] = $r['code'];
++            }
++        }
+ 
+-  // —— ELIMINAR DOCUMENTO ——  
+-  case 'delete':
+-    $id = (int)($_GET['id'] ?? 0);
+-    $old = $db->prepare('SELECT path FROM documents WHERE id=?');
+-    $old->execute([$id]);
+-    $oldPath = $old->fetchColumn();
+-    if ($oldPath) {
+-      $fullPath = resolveUploadFullPath($oldPath, $clientSlug);
+-      if ($fullPath) {
+-        @unlink($fullPath);
+-      }
+-    }
+-    $db->prepare('DELETE FROM codes WHERE document_id=?')->execute([$id]);
+-    $db->prepare('DELETE FROM documents WHERE id=?')->execute([$id]);
+-    echo json_encode(['message'=>'Documento eliminado']);
+-    break;
+-
+-// —— BÚSQUEDA POR CÓDIGO ——  
+-case 'search_by_code':
+-  $code = trim($_POST['code'] ?? $_GET['code'] ?? '');
+-  if (!$code) {
+-    echo json_encode([]);
+-    exit;
+-  }
+-
+-  // Trae todos los códigos asociados al documento donde existe el código buscado (insensible a mayúsculas)
+-  $stmt = $db->prepare("
+-    SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c2.code SEPARATOR '\n') AS codes
+-    FROM documents d
+-    JOIN codes c1 ON d.id = c1.document_id
+-    LEFT JOIN codes c2 ON d.id = c2.document_id
+-    WHERE UPPER(c1.code) = UPPER(?)
+-    GROUP BY d.id
+-  ");
+-  $stmt->execute([$code]);
+-  $rows = $stmt->fetchAll();
+-
+-  $docs = array_map(function($r) use ($clientSlug){
+-    return [
+-      'id'    => (int)$r['id'],
+-      'name'  => $r['name'],
+-      'date'  => $r['date'],
+-      'path'  => normalizeDocumentPath($r['path'], $clientSlug),
+-      'codes' => $r['codes'] ? explode("\n", $r['codes']) : []
+-    ];
+-  }, $rows);
++        $remaining = $codes;
++        $selected  = [];
++        while ($remaining) {
++            $best = null;
++            $bestCover = [];
++            foreach ($docs as $d) {
++                $cover = array_intersect($d['codes'], $remaining);
++                if (!$best
++                    || count($cover) > count($bestCover)
++                    || (count($cover) === count($bestCover) && $d['date'] > $best['date'])
++                ) {
++                    $best      = $d;
++                    $bestCover = $cover;
++                }
++            }
++            if (!$best || empty($bestCover)) {
++                break;
++            }
++            $selected[] = $best;
++            $remaining = array_diff($remaining, $bestCover);
++            unset($docs[$best['id']]);
++        }
+ 
+-  echo json_encode($docs);
+-  break;
++        echo json_encode(array_values($selected));
++        break;
++
++    case 'download_pdfs':
++        $uploadsDir = $clientUploadsDir;
++        if (!is_dir($uploadsDir)) {
++            respondError('Carpeta uploads del cliente no encontrada', 404);
++        }
+ 
+-  case 'branding':
+-    echo json_encode($branding);
+-    break;
++        $tmpFile = tempnam(sys_get_temp_dir(), 'zip');
++        $zip = new ZipArchive();
++        if ($zip->open($tmpFile, ZipArchive::CREATE) !== true) {
++            respondError('No se pudo crear el ZIP', 500);
++        }
++
++        $files = new RecursiveIteratorIterator(
++            new RecursiveDirectoryIterator($uploadsDir, FilesystemIterator::SKIP_DOTS),
++            RecursiveIteratorIterator::LEAVES_ONLY
++        );
++        foreach ($files as $file) {
++            if (!$file->isDir()) {
++                $filePath     = $file->getRealPath();
++                $relativePath = substr($filePath, strlen($uploadsDir) + 1);
++                $zip->addFile($filePath, $relativePath);
++            }
++        }
++        $zip->close();
++
++        header('Content-Type: application/zip');
++        header('Content-Disposition: attachment; filename="uploads_' . $clientSlug . '_' . date('Ymd_His') . '.zip"');
++
++        readfile($tmpFile);
++        unlink($tmpFile);
++        exit;
++
++    case 'edit':
++        $id   = (int)($_POST['id'] ?? 0);
++        $name = $_POST['name'] ?? '';
++        $date = $_POST['date'] ?? '';
++        $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
++
++        if (!$id || !$name || !$date) {
++            respondError('Faltan campos obligatorios', 400);
++        }
++
++        if (!empty($_FILES['file']['tmp_name'])) {
++            $old = $db->prepare('SELECT path FROM documents WHERE id = ?');
++            $old->execute([$id]);
++            $oldPath = $old->fetchColumn();
++            if ($oldPath) {
++                $fullOldPath = resolveUploadFullPath((string)$oldPath, $clientSlug);
++                if ($fullOldPath) {
++                    @unlink($fullOldPath);
++                }
++            }
++            $filename   = time() . '_' . basename($_FILES['file']['name']);
++            $storedPath = buildStoredUploadPath($filename, $clientSlug);
++            $fullPath   = __DIR__ . '/' . $storedPath;
++            if (!move_uploaded_file($_FILES['file']['tmp_name'], $fullPath)) {
++                respondError('No se pudo subir el PDF actualizado', 500);
++            }
++            $db->prepare('UPDATE documents SET name = ?, date = ?, path = ? WHERE id = ?')
++               ->execute([$name, $date, $storedPath, $id]);
++        } else {
++            $db->prepare('UPDATE documents SET name = ?, date = ? WHERE id = ?')
++               ->execute([$name, $date, $id]);
++        }
++
++        $db->prepare('DELETE FROM codes WHERE document_id = ?')->execute([$id]);
++        $ins = $db->prepare('INSERT INTO codes (document_id, code) VALUES (?, ?)');
++        foreach (array_unique($codes) as $c) {
++            $ins->execute([$id, $c]);
++        }
++        echo json_encode(['message' => 'Documento actualizado']);
++        break;
++
++    case 'delete':
++        $id = (int)($_GET['id'] ?? 0);
++        if (!$id) {
++            respondError('Documento no especificado', 400);
++        }
++
++        $old = $db->prepare('SELECT path FROM documents WHERE id = ?');
++        $old->execute([$id]);
++        $oldPath = $old->fetchColumn();
++        if ($oldPath) {
++            $fullPath = resolveUploadFullPath((string)$oldPath, $clientSlug);
++            if ($fullPath) {
++                @unlink($fullPath);
++            }
++        }
++        $db->prepare('DELETE FROM codes WHERE document_id = ?')->execute([$id]);
++        $db->prepare('DELETE FROM documents WHERE id = ?')->execute([$id]);
++        echo json_encode(['message' => 'Documento eliminado']);
++        break;
++
++    case 'search_by_code':
++        $code = trim($_POST['code'] ?? $_GET['code'] ?? '');
++        if ($code === '') {
++            echo json_encode([]);
++            break;
++        }
+ 
+-  default:
+-    echo json_encode(['error'=>'Acción inválida']);
+-    break;
++        $stmt = $db->prepare(
++            'SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c2.code SEPARATOR "\n") AS codes
++             FROM documents d
++             JOIN codes c1 ON d.id = c1.document_id
++             LEFT JOIN codes c2 ON d.id = c2.document_id
++             WHERE UPPER(c1.code) = UPPER(?)
++             GROUP BY d.id'
++        );
++        $stmt->execute([$code]);
++        $rows = $stmt->fetchAll();
++
++        $docs = array_map(
++            function (array $r) use ($clientSlug) {
++                return [
++                    'id'    => (int)$r['id'],
++                    'name'  => $r['name'],
++                    'date'  => $r['date'],
++                    'path'  => normalizeDocumentPath($r['path'], $clientSlug),
++                    'codes' => $r['codes'] ? explode("\n", $r['codes']) : [],
++                ];
++            },
++            $rows
++        );
++
++        echo json_encode($docs);
++        break;
++
++    case 'branding':
++        echo json_encode($branding);
++        break;
++
++    default:
++        echo json_encode(['error' => 'Acción inválida']);
++        break;
+ }
+diff --git a/client-generator.php b/client-generator.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..772ccf39a8fdfc2d9978878e240c44f7ceee3335
+--- /dev/null
++++ b/client-generator.php
+@@ -0,0 +1,261 @@
++<?php
++declare(strict_types=1);
++
++header('Content-Type: application/json');
++
++if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
++    http_response_code(405);
++    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
++    exit;
++}
++
++function respond(array $payload, int $status = 200): void
++{
++    http_response_code($status);
++    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
++    exit;
++}
++
++function slugify(string $value): string
++{
++    $value = mb_strtolower(trim($value), 'UTF-8');
++    $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value;
++    $value = preg_replace('/[^a-z0-9-]+/i', '-', $value) ?? '';
++    $value = preg_replace('/--+/', '-', $value) ?? '';
++    return trim($value, '-') ?: '';
++}
++
++function darkenColor(string $hex, float $factor = 0.2): string
++{
++    $hex = ltrim($hex, '#');
++    if (strlen($hex) === 3) {
++        $hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
++    }
++    if (strlen($hex) !== 6 || !ctype_xdigit($hex)) {
++        return '#000000';
++    }
++    $rgb = [];
++    for ($i = 0; $i < 6; $i += 2) {
++        $component = hexdec(substr($hex, $i, 2));
++        $adjusted = max(0, min(255, (int)round($component * (1 - $factor))));
++        $rgb[] = str_pad(dechex($adjusted), 2, '0', STR_PAD_LEFT);
++    }
++    return '#' . implode('', $rgb);
++}
++
++$clientName = trim((string)($_POST['client_name'] ?? ''));
++$clientSlug = trim((string)($_POST['client_slug'] ?? ''));
++$adminUser  = trim((string)($_POST['admin_user'] ?? ''));
++$adminPass  = (string)($_POST['admin_pass'] ?? '');
++$dbHost     = trim((string)($_POST['db_host'] ?? ''));
++$dbName     = trim((string)($_POST['db_name'] ?? ''));
++$dbUser     = trim((string)($_POST['db_user'] ?? ''));
++$dbPass     = (string)($_POST['db_pass'] ?? '');
++$dbPort     = (int)($_POST['db_port'] ?? 3306);
++$primaryColor = trim((string)($_POST['primary_color'] ?? '#F87171'));
++$primaryHover = trim((string)($_POST['primary_hover'] ?? ''));
++$highlighter  = trim((string)($_POST['pdf_highlighter_url'] ?? ''));
++
++if ($clientName === '') {
++    respond(['success' => false, 'error' => 'El nombre del cliente es obligatorio'], 422);
++}
++
++if ($clientSlug === '') {
++    $clientSlug = slugify($clientName);
++}
++$clientSlug = slugify($clientSlug);
++if ($clientSlug === '') {
++    respond(['success' => false, 'error' => 'El ID del cliente no es válido'], 422);
++}
++
++if ($adminUser === '' || $adminPass === '') {
++    respond(['success' => false, 'error' => 'Las credenciales del administrador son obligatorias'], 422);
++}
++
++if ($dbHost === '' || $dbName === '' || $dbUser === '' || $dbPass === '') {
++    respond(['success' => false, 'error' => 'Todos los campos de la base de datos son obligatorios'], 422);
++}
++
++if (!isset($_FILES['logo']) || $_FILES['logo']['error'] !== UPLOAD_ERR_OK) {
++    respond(['success' => false, 'error' => 'El logo es obligatorio y debe subirse correctamente'], 422);
++}
++
++$allowedExtensions = ['png', 'svg', 'jpg', 'jpeg', 'webp'];
++$logoInfo = $_FILES['logo'];
++$logoExtension = strtolower(pathinfo($logoInfo['name'], PATHINFO_EXTENSION));
++if (!in_array($logoExtension, $allowedExtensions, true)) {
++    respond(['success' => false, 'error' => 'Formato de logo no soportado'], 422);
++}
++
++if ($primaryHover === '') {
++    $primaryHover = darkenColor($primaryColor);
++}
++
++$rootPath = __DIR__;
++$clientsDir = $rootPath . '/clientes';
++$clientDir  = $clientsDir . '/' . $clientSlug;
++$uploadsDir = $rootPath . '/uploads/' . $clientSlug;
++$adminDir   = $rootPath . '/admin/' . $clientSlug;
++$bcDir      = $rootPath . '/bc/' . $clientSlug;
++$templatesAdmin = $rootPath . '/templates/admin-base';
++$templatesBc    = $rootPath . '/templates/bc-base';
++
++if (!is_dir($templatesAdmin) || !is_dir($templatesBc)) {
++    respond(['success' => false, 'error' => 'No se encontraron las plantillas base requeridas'], 500);
++}
++
++if (is_dir($clientDir) || is_dir($adminDir) || is_dir($bcDir)) {
++    respond(['success' => false, 'error' => 'Ya existe una instancia para este cliente'], 409);
++}
++
++foreach ([$clientsDir, $rootPath . '/uploads', $rootPath . '/admin', $rootPath . '/bc'] as $dir) {
++    if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
++        respond(['success' => false, 'error' => 'No se pudo preparar la estructura base'], 500);
++    }
++}
++
++$structureCreated = @mkdir($clientDir, 0775, true) && @mkdir($uploadsDir, 0775, true) && @mkdir($adminDir, 0775, true) && @mkdir($bcDir, 0775, true);
++if (!$structureCreated) {
++    respond(['success' => false, 'error' => 'No se pudo crear la estructura de carpetas del cliente'], 500);
++}
++
++$logoFilename = 'logo.' . $logoExtension;
++$logoPath = $clientDir . '/' . $logoFilename;
++$logoSaved = move_uploaded_file($logoInfo['tmp_name'], $logoPath);
++if (!$logoSaved) {
++    respond(['success' => false, 'error' => 'No se pudo guardar el logo del cliente'], 500);
++}
++
++function copyTemplateDirectory(string $source, string $destination, array $replacements): bool
++{
++    $iterator = new RecursiveIteratorIterator(
++        new RecursiveDirectoryIterator($source, FilesystemIterator::SKIP_DOTS),
++        RecursiveIteratorIterator::SELF_FIRST
++    );
++    foreach ($iterator as $item) {
++        $relative = substr($item->getPathname(), strlen($source));
++        $targetPath = $destination . $relative;
++        if ($item->isDir()) {
++            if (!is_dir($targetPath) && !mkdir($targetPath, 0775, true) && !is_dir($targetPath)) {
++                return false;
++            }
++        } else {
++            $contents = file_get_contents($item->getPathname());
++            if ($contents === false) {
++                return false;
++            }
++            $contents = strtr($contents, $replacements);
++            if (file_put_contents($targetPath, $contents) === false) {
++                return false;
++            }
++        }
++    }
++    return true;
++}
++
++$replacements = ['__CLIENT_SLUG__' => $clientSlug];
++
++if (!copyTemplateDirectory($templatesAdmin, $adminDir, $replacements)) {
++    respond(['success' => false, 'error' => 'No se pudieron copiar las plantillas del panel administrador'], 500);
++}
++
++if (!copyTemplateDirectory($templatesBc, $bcDir, $replacements)) {
++    respond(['success' => false, 'error' => 'No se pudieron copiar las plantillas del portal público'], 500);
++}
++
++$configData = [
++    'db' => [
++        'host'    => $dbHost,
++        'port'    => $dbPort ?: 3306,
++        'dbname'  => $dbName,
++        'user'    => $dbUser,
++        'pass'    => $dbPass,
++        'charset' => 'utf8mb4',
++    ],
++    'branding' => [
++        'client_name' => $clientName,
++        'logo_path'   => 'clientes/' . $clientSlug . '/' . $logoFilename,
++        'colors'      => [
++            'primary'       => $primaryColor,
++            'primary_hover' => $primaryHover,
++        ],
++    ],
++    'admin' => [
++        'user'      => $adminUser,
++        'pass_hash' => password_hash($adminPass, PASSWORD_DEFAULT),
++    ],
++];
++if ($highlighter !== '') {
++    $configData['pdf_highlighter_url'] = $highlighter;
++}
++
++$configExport = "<?php\nreturn " . var_export($configData, true) . ";\n";
++if (file_put_contents($clientDir . '/config.php', $configExport) === false) {
++    respond(['success' => false, 'error' => 'No se pudo escribir el archivo de configuración'], 500);
++}
++
++$tablesCreated = false;
++$dbError = null;
++try {
++    $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $dbHost, $configData['db']['port'], $dbName);
++    $pdo = new PDO($dsn, $dbUser, $dbPass, [
++        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
++    ]);
++    $pdo->exec('CREATE TABLE IF NOT EXISTS documents (
++        id INT AUTO_INCREMENT PRIMARY KEY,
++        name VARCHAR(255) NOT NULL,
++        date DATE NOT NULL,
++        path VARCHAR(255) NOT NULL,
++        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++        INDEX idx_date (date),
++        INDEX idx_path (path)
++    ) ENGINE=InnoDB CHARSET=utf8mb4');
++
++    $pdo->exec('CREATE TABLE IF NOT EXISTS codes (
++        id INT AUTO_INCREMENT PRIMARY KEY,
++        document_id INT NOT NULL,
++        code VARCHAR(100) NOT NULL,
++        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
++        INDEX idx_document_id (document_id),
++        INDEX idx_code (code),
++        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
++    ) ENGINE=InnoDB CHARSET=utf8mb4');
++    $tablesCreated = true;
++} catch (Throwable $e) {
++    $dbError = $e->getMessage();
++}
++
++$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
++$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
++$baseUrl = rtrim($protocol . '://' . $host, '/');
++$adminUrl = $baseUrl . '/admin/' . $clientSlug . '/';
++$publicUrl = $baseUrl . '/bc/' . $clientSlug . '/';
++
++respond([
++    'success' => true,
++    'client' => [
++        'id'         => $clientSlug,
++        'name'       => $clientName,
++        'admin_url'  => $adminUrl,
++        'public_url' => $publicUrl,
++    ],
++    'admin' => [
++        'url'            => $adminUrl,
++        'user'           => $adminUser,
++        'password_hint'  => '(la que ingresaste)',
++    ],
++    'database' => [
++        'host' => $dbHost,
++        'port' => $configData['db']['port'],
++        'name' => $dbName,
++        'user' => $dbUser,
++    ],
++    'branding' => [
++        'logo_saved' => $logoSaved,
++    ],
++    'status' => [
++        'structure' => $structureCreated,
++        'tables'    => $tablesCreated,
++        'db_error'  => $dbError,
++    ],
++]);
+diff --git a/client-manager.php b/client-manager.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f9fe7ea68c814c4e0300bd05beb2104b9b63dd4
+--- /dev/null
++++ b/client-manager.php
+@@ -0,0 +1,110 @@
++<?php
++declare(strict_types=1);
++
++header('Content-Type: application/json');
++
++function respond(array $payload, int $status = 200): void
++{
++    http_response_code($status);
++    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
++    exit;
++}
++
++function sanitizeSlug(string $slug): string
++{
++    $slug = strtolower(trim($slug));
++    $slug = preg_replace('/[^a-z0-9-]+/', '-', $slug) ?? '';
++    $slug = preg_replace('/--+/', '-', $slug) ?? '';
++    return trim($slug, '-');
++}
++
++function removeDirectory(string $path): void
++{
++    if (!is_dir($path)) {
++        return;
++    }
++    $iterator = new RecursiveIteratorIterator(
++        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
++        RecursiveIteratorIterator::CHILD_FIRST
++    );
++    foreach ($iterator as $item) {
++        if ($item->isDir()) {
++            @rmdir($item->getPathname());
++        } else {
++            @unlink($item->getPathname());
++        }
++    }
++    @rmdir($path);
++}
++
++$action = $_REQUEST['action'] ?? 'list';
++$rootPath = __DIR__;
++$clientsDir = $rootPath . '/clientes';
++$uploadsDir = $rootPath . '/uploads';
++$adminDir   = $rootPath . '/admin';
++$bcDir      = $rootPath . '/bc';
++$logsDir    = $rootPath . '/logs';
++$logFile    = $logsDir . '/client-manager.log';
++
++if (!is_dir($logsDir)) {
++    @mkdir($logsDir, 0775, true);
++}
++
++switch ($action) {
++    case 'list':
++        $clients = [];
++        if (is_dir($clientsDir)) {
++            $finder = glob($clientsDir . '/*/config.php');
++            if ($finder !== false) {
++                foreach ($finder as $configPath) {
++                    $slug = basename(dirname($configPath));
++                    $config = @include $configPath;
++                    if (!is_array($config)) {
++                        continue;
++                    }
++                    $brandingSource = [];
++                    if (isset($config['branding']) && is_array($config['branding'])) {
++                        $brandingSource = $config['branding'];
++                    }
++                    $branding = $brandingSource['client_name'] ?? $brandingSource['name'] ?? $config['BRAND_NAME'] ?? $slug;
++                    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
++                    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
++                    $baseUrl = rtrim($protocol . '://' . $host, '/');
++                    $clients[] = [
++                        'id'         => $slug,
++                        'name'       => $branding,
++                        'admin_url'  => $baseUrl . '/admin/' . $slug . '/',
++                        'public_url' => $baseUrl . '/bc/' . $slug . '/',
++                    ];
++                }
++            }
++        }
++        respond(['success' => true, 'clients' => $clients]);
++
++    case 'delete':
++        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
++            respond(['success' => false, 'error' => 'Método no permitido'], 405);
++        }
++        $client = sanitizeSlug((string)($_POST['client'] ?? ''));
++        if ($client === '') {
++            respond(['success' => false, 'error' => 'Cliente inválido'], 422);
++        }
++
++        $paths = [
++            $clientsDir . '/' . $client,
++            $uploadsDir . '/' . $client,
++            $adminDir . '/' . $client,
++            $bcDir . '/' . $client,
++        ];
++        foreach ($paths as $path) {
++            removeDirectory($path);
++        }
++
++        $logEntry = sprintf("%s\tDELETE\t%s\t%s\n", date('c'), $client, $_SERVER['REMOTE_ADDR'] ?? 'cli');
++        @file_put_contents($logFile, $logEntry, FILE_APPEND);
++
++        respond(['success' => true]);
++
++    default:
++        respond(['success' => false, 'error' => 'Acción no soportada'], 400);
++}
+diff --git a/logs/.gitignore b/logs/.gitignore
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6b7ef32c8478a48c3994dcadc86837f4371184d
+--- /dev/null
++++ b/logs/.gitignore
+@@ -0,0 +1,2 @@
++*
++!.gitignore
+diff --git a/templates/admin-base/.htaccess b/templates/admin-base/.htaccess
+new file mode 100644
+index 0000000000000000000000000000000000000000..e063544df49992717cb87564c119dd7912005274
+--- /dev/null
++++ b/templates/admin-base/.htaccess
+@@ -0,0 +1,3 @@
++RewriteEngine On
++RewriteBase /admin/__CLIENT_SLUG__/
++RewriteRule ^$ index.php [L]
+diff --git a/templates/admin-base/index.php b/templates/admin-base/index.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3f097beb7a7835fe5e4a84207b6067b0fd57efb
+--- /dev/null
++++ b/templates/admin-base/index.php
+@@ -0,0 +1,236 @@
++<?php
++declare(strict_types=1);
++
++$rootPath = dirname(__DIR__, 2);
++$config   = require $rootPath . '/clientes/__CLIENT_SLUG__/config.php';
++$branding = $config['branding'] ?? [];
++if (!is_array($branding)) {
++    $branding = [];
++}
++
++$brandName = $branding['client_name'] ?? $branding['name'] ?? $config['BRAND_NAME'] ?? 'Panel Administrativo';
++$logoPath  = $branding['logo_path'] ?? $branding['logo'] ?? $config['BRAND_LOGO'] ?? null;
++$colors    = $branding['colors'] ?? $config['BRAND_COLORS'] ?? [];
++if (!is_array($colors)) {
++    $colors = [];
++}
++
++$primary       = $colors['primary'] ?? '#F87171';
++$primaryHover  = $colors['primary_hover'] ?? '#DC2626';
++$secondary     = $colors['secondary'] ?? '#D1D5DB';
++$secondaryHover= $colors['secondary_hover'] ?? '#9CA3AF';
++$dark          = $colors['dark'] ?? '#374151';
++$darkHover     = $colors['dark_hover'] ?? '#1F2937';
++$warning       = $colors['warning'] ?? '#8B5E5E';
++$warningHover  = $colors['warning_hover'] ?? '#6B4542';
++$onLight       = $colors['on_light'] ?? '#1F2937';
++$onDark        = $colors['on_dark'] ?? '#FFFFFF';
++
++$logoUrl = $logoPath ? '../../' . ltrim($logoPath, '/') : null;
++?>
++<!DOCTYPE html>
++<html lang="es" data-client="__CLIENT_SLUG__">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="google" content="notranslate" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
++  <meta http-equiv="Pragma" content="no-cache" />
++  <meta http-equiv="Expires" content="0" />
++  <script src="https://cdn.tailwindcss.com"></script>
++  <title><?php echo htmlspecialchars($brandName); ?> – Panel Administrativo</title>
++  <style>
++    .overlay { position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:9999; }
++    .overlay.hidden { display:none; }
++    .modal { background:white; border-radius:0.5rem; max-width:360px; width:90%; padding:2rem; box-shadow:0 2px 10px rgba(0,0,0,0.3); text-align:center; }
++    .modal input, .modal button { font-size:1rem; }
++    .modal label { display:block; text-align:left; font-weight:600; margin-top:0.75rem; }
++    .modal input { width:100%; padding:0.6rem; margin-top:0.3rem; border:1px solid #d1d5db; border-radius:0.375rem; }
++    .modal button { margin-top:1rem; width:100%; }
++    #toast-container { position:fixed; top:1rem; left:50%; transform:translateX(-50%); display:flex; flex-direction:column; gap:0.5rem; z-index:10000; }
++    .toast { min-width:240px; max-width:480px; background-color:var(--color-primary); color:var(--color-on-dark); padding:1rem 1.5rem; border-radius:0.375rem; box-shadow:0 2px 6px rgba(0,0,0,0.2); display:flex; align-items:center; justify-content:space-between; font-size:1.125rem; }
++    .toast button { background:transparent; border:none; color:inherit; font-weight:bold; margin-left:1rem; cursor:pointer; font-size:1.125rem; }
++    #confirmOverlay, #deleteOverlay { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:10001; }
++    #confirmOverlay.hidden, #deleteOverlay.hidden { display:none; }
++    .modal.confirm, .modal.deleteKey { background:white; border-radius:0.5rem; padding:1.5rem; max-width:320px; width:90%; box-shadow:0 2px 10px rgba(0,0,0,0.3); text-align:center; }
++    .modal.confirm button, .modal.deleteKey button { margin:0.5rem; padding:0.5rem 1rem; font-size:1rem; border-radius:0.25rem; }
++    .tab.active { border-bottom:2px solid var(--color-primary); color:var(--color-primary); }
++    .button-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
++    :root {
++      --btn-padding: 0.5rem 1rem;
++      --btn-radius: 0.375rem;
++      --btn-font-size: 1rem;
++      --btn-transition: background-color .2s;
++      --color-primary: <?php echo $primary; ?>;
++      --color-primary-hover: <?php echo $primaryHover; ?>;
++      --color-secondary: <?php echo $secondary; ?>;
++      --color-secondary-hover: <?php echo $secondaryHover; ?>;
++      --color-dark: <?php echo $dark; ?>;
++      --color-dark-hover: <?php echo $darkHover; ?>;
++      --color-warning: <?php echo $warning; ?>;
++      --color-warning-hover: <?php echo $warningHover; ?>;
++      --color-on-light: <?php echo $onLight; ?>;
++      --color-on-dark: <?php echo $onDark; ?>;
++    }
++    .btn { padding: var(--btn-padding); border-radius: var(--btn-radius); font-size: var(--btn-font-size); transition: var(--btn-transition); border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
++    .btn--primary { background: var(--color-primary); color: var(--color-on-dark); }
++    .btn--primary:hover { background: var(--color-primary-hover); }
++    .btn--secondary { background: var(--color-secondary); color: var(--color-on-light); }
++    .btn--secondary:hover { background: var(--color-secondary-hover); }
++    .btn--dark { background: var(--color-dark); color: var(--color-on-dark); }
++    .btn--dark:hover { background: var(--color-dark-hover); }
++    .btn--warning { background: var(--color-warning); color: var(--color-on-dark); }
++    .btn--warning:hover { background: var(--color-warning-hover); }
++    .btn--full { width: 100%; }
++    .btn--flex1 { flex: 1; }
++    @media (max-width: 1024px) {
++      .max-w-4xl { max-width: 90%; }
++    }
++    @media (max-width: 768px) {
++      #tabs { flex-direction: column; }
++      .flex.gap-4 { flex-direction: column; }
++      .p-6 { padding: 1rem; }
++    }
++    @media (max-width: 480px) {
++      h1.text-2xl { font-size: 1.5rem; }
++      .modal { max-width: 95%; padding: 1.25rem; }
++      .btn { padding: 0.5rem; font-size: 0.875rem; }
++      textarea, input { font-size: 0.875rem; }
++    }
++  </style>
++  <script>
++    window.__CLIENT_BRANDING__ = <?php echo json_encode([
++        'name'   => $brandName,
++        'logo'   => $logoUrl,
++        'colors' => [
++            'primary'        => $primary,
++            'primary_hover'  => $primaryHover,
++            'secondary'      => $secondary,
++            'secondary_hover'=> $secondaryHover,
++            'dark'           => $dark,
++            'dark_hover'     => $darkHover,
++            'warning'        => $warning,
++            'warning_hover'  => $warningHover,
++        ],
++    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
++  </script>
++  <script defer src="script.js"></script>
++</head>
++<body class="bg-gray-100 min-h-screen flex items-start justify-center p-6">
++  <div id="loginOverlay" class="overlay">
++    <div class="modal">
++      <?php if ($logoUrl): ?>
++        <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo <?php echo htmlspecialchars($brandName); ?>" class="mx-auto h-16 mb-4" />
++      <?php endif; ?>
++      <h2 class="text-xl font-semibold mb-4">Acceso a <?php echo htmlspecialchars($brandName); ?></h2>
++      <form id="loginForm" class="text-left">
++        <label for="loginUser">Usuario</label>
++        <input id="loginUser" name="user" type="text" autocomplete="username" required />
++        <label for="loginPass">Contraseña</label>
++        <input id="loginPass" name="pass" type="password" autocomplete="current-password" required />
++        <button type="submit" class="btn btn--primary">Iniciar sesión</button>
++      </form>
++      <p id="loginError" class="mt-3 text-red-500 hidden">Credenciales inválidas. Inténtalo nuevamente.</p>
++    </div>
++  </div>
++
++  <div id="confirmOverlay" class="overlay hidden">
++    <div id="confirmBox" class="modal confirm">
++      <p id="confirmMsg">¿Confirmar acción?</p>
++      <button id="confirmOk" class="btn btn--primary">Aceptar</button>
++      <button id="confirmCancel" class="btn btn--secondary">Cancelar</button>
++    </div>
++  </div>
++
++  <div id="deleteOverlay" class="overlay hidden">
++    <div class="modal deleteKey">
++      <h2 class="text-xl font-semibold">Clave de Eliminación</h2>
++      <p class="mt-2 text-gray-700">Ingrese la clave para eliminar:</p>
++      <input id="deleteKeyInput" type="password" placeholder="Clave de borrado" class="mt-2 w-full border rounded px-3 py-2" />
++      <p id="deleteKeyError" class="mt-2 text-red-500 hidden">Clave incorrecta.</p>
++      <button id="deleteKeyOk" class="btn btn--primary btn--full">Enviar</button>
++      <button id="deleteKeyCancel" class="btn btn--secondary btn--full">Cancelar</button>
++    </div>
++  </div>
++
++  <div id="toast-container"></div>
++
++  <div id="mainContent" class="w-full max-w-4xl bg-white rounded-2xl shadow-lg hidden">
++    <div class="bg-white border-b flex items-center justify-between px-6 py-4">
++      <div class="flex items-center gap-3">
++        <?php if ($logoUrl): ?>
++          <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo <?php echo htmlspecialchars($brandName); ?>" class="h-12 hidden sm:block" />
++        <?php endif; ?>
++        <h1 class="text-2xl font-bold" id="brandHeading"><?php echo htmlspecialchars($brandName); ?></h1>
++      </div>
++      <button id="logoutBtn" class="btn btn--secondary">Cerrar sesión</button>
++    </div>
++    <nav class="border-b bg-white shadow-sm">
++      <ul id="tabs" class="flex">
++        <li class="tab flex-1 text-center cursor-pointer px-6 py-4 active" data-tab="tab-search">Buscar</li>
++        <li class="tab flex-1 text-center cursor-pointer px-6 py-4" data-tab="tab-upload">Subir</li>
++        <li class="tab flex-1 text-center cursor-pointer px-6 py-4" data-tab="tab-list">Consultar</li>
++        <li class="tab flex-1 text-center cursor-pointer px-6 py-4" data-tab="tab-code">Búsqueda por Código</li>
++      </ul>
++    </nav>
++    <div class="p-6 space-y-6">
++      <div id="tab-search" class="tab-content">
++        <h2 class="text-xl font-semibold mb-4">Búsqueda Inteligente</h2>
++        <textarea id="searchInput" rows="6" class="w-full border rounded px-3 py-2 text-lg mb-4" placeholder="Pega aquí tus códigos o bloque de texto…"></textarea>
++        <div class="flex gap-4 mb-4">
++          <button id="btnDoSearch" class="btn btn--primary btn--flex1 text-lg">Buscar</button>
++          <button id="btnClearSearch" class="btn btn--secondary btn--flex1 text-lg">Limpiar</button>
++        </div>
++        <div id="search-alert" class="text-red-600 font-medium text-lg mb-4"></div>
++        <div id="results-search" class="space-y-4"></div>
++      </div>
++
++      <div id="tab-upload" class="tab-content hidden">
++        <h2 class="text-xl font-semibold mb-4">Subir / Editar Documento</h2>
++        <form id="form-upload" enctype="multipart/form-data" class="space-y-4">
++          <input id="docId" type="hidden" name="id" />
++          <div>
++            <label class="block mb-1 text-lg">Nombre</label>
++            <input id="name" name="name" type="text" required class="w-full border rounded px-3 py-2 text-lg" />
++          </div>
++          <div>
++            <label class="block mb-1 text-lg">Fecha</label>
++            <input id="date" name="date" type="date" required class="w-full border rounded px-3 py-2 text-lg" />
++          </div>
++          <div>
++            <label class="block mb-1 text-lg">PDF o Documento</label>
++            <input id="file" name="file" type="file" accept="application/pdf,image/*" class="w-full text-lg" />
++            <p id="uploadWarning" class="mt-1 text-red-600 text-sm hidden">El archivo excede los 10 MB. Por favor, sube uno menor.</p>
++          </div>
++          <div>
++            <label class="block mb-1 text-lg">Códigos</label>
++            <textarea id="codes" name="codes" rows="4" class="w-full border rounded px-3 py-2 text-lg"></textarea>
++          </div>
++          <button type="submit" class="btn btn--primary btn--full text-lg">Guardar</button>
++        </form>
++      </div>
++
++      <div id="tab-list" class="tab-content hidden">
++        <h2 class="text-xl font-semibold mb-4">Consultar Documentos</h2>
++        <div class="flex flex-wrap gap-4 mb-4">
++          <input id="consultFilterInput" type="text" class="flex-1 min-w-[200px] border rounded px-3 py-2 text-lg" placeholder="Filtrar por nombre o PDF" />
++          <button id="btnClearConsult" class="btn btn--secondary text-lg">Limpiar</button>
++          <button id="btnDownloadCsv" class="btn btn--primary text-lg">Descargar CSV</button>
++          <button id="btnDownloadPdfs" class="btn btn--dark text-lg">Descargar PDFs</button>
++        </div>
++        <div id="results-list" class="space-y-4"></div>
++      </div>
++
++      <div id="tab-code" class="tab-content hidden">
++        <h2 class="text-xl font-semibold mb-4">Búsqueda por Código</h2>
++        <div class="relative mb-4">
++          <input id="codeInput" type="text" class="w-full border rounded px-3 py-2 text-lg" placeholder="Código en MAYÚSCULAS (ej: ABC123)" autocomplete="off" />
++          <div id="suggestions" class="absolute top-full left-0 right-0 bg-white border rounded-b px-2 shadow max-h-48 overflow-auto hidden z-20"></div>
++        </div>
++        <button id="btnSearchCode" class="btn btn--primary btn--full mb-4 text-lg">Buscar por Código</button>
++        <div id="results-code" class="space-y-4"></div>
++      </div>
++    </div>
++  </div>
++</body>
++</html>
+diff --git a/templates/admin-base/script.js b/templates/admin-base/script.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..746ad439ba4565b0cd6b82c2a6941d47c4dda6d3
+--- /dev/null
++++ b/templates/admin-base/script.js
+@@ -0,0 +1,553 @@
++(() => {
++  const CLIENT_ID = document.documentElement.dataset.client;
++  const API_BASE = '../../api.php';
++  const UPLOAD_BASE = '../../';
++  const BRAND_DATA = window.__CLIENT_BRANDING__ || {};
++
++  const loginOverlay = document.getElementById('loginOverlay');
++  const loginForm = document.getElementById('loginForm');
++  const loginError = document.getElementById('loginError');
++  const mainContent = document.getElementById('mainContent');
++  const logoutBtn = document.getElementById('logoutBtn');
++  const brandHeading = document.getElementById('brandHeading');
++  const confirmOverlay = document.getElementById('confirmOverlay');
++  const confirmMsg = document.getElementById('confirmMsg');
++  const confirmOk = document.getElementById('confirmOk');
++  const confirmCancel = document.getElementById('confirmCancel');
++  const deleteOverlay = document.getElementById('deleteOverlay');
++  const deleteKeyInput = document.getElementById('deleteKeyInput');
++  const deleteKeyError = document.getElementById('deleteKeyError');
++  const deleteKeyOk = document.getElementById('deleteKeyOk');
++  const deleteKeyCancel = document.getElementById('deleteKeyCancel');
++  const toastContainer = document.getElementById('toast-container');
++
++  const searchInput = document.getElementById('searchInput');
++  const searchAlert = document.getElementById('search-alert');
++  const resultsSearch = document.getElementById('results-search');
++  const uploadForm = document.getElementById('form-upload');
++  const uploadWarning = document.getElementById('uploadWarning');
++  const consultFilterInput = document.getElementById('consultFilterInput');
++  const resultsList = document.getElementById('results-list');
++  const codeInput = document.getElementById('codeInput');
++  const suggestions = document.getElementById('suggestions');
++  const resultsCode = document.getElementById('results-code');
++
++  const btnDoSearch = document.getElementById('btnDoSearch');
++  const btnClearSearch = document.getElementById('btnClearSearch');
++  const btnClearConsult = document.getElementById('btnClearConsult');
++  const btnDownloadCsv = document.getElementById('btnDownloadCsv');
++  const btnDownloadPdfs = document.getElementById('btnDownloadPdfs');
++  const btnSearchCode = document.getElementById('btnSearchCode');
++
++  const DELETION_KEY = '0101';
++
++  let fullList = [];
++  let pendingDeleteId = null;
++  let intervalId = null;
++  let initialized = false;
++
++  function withClient(url) {
++    const [base, hash] = url.split('#');
++    const separator = base.includes('?') ? '&' : '?';
++    const newUrl = `${base}${separator}client=${encodeURIComponent(CLIENT_ID)}`;
++    return hash ? `${newUrl}#${hash}` : newUrl;
++  }
++
++  function fileUrl(path) {
++    if (!path) return '#';
++    return path.startsWith('uploads/') ? `${UPLOAD_BASE}${path}` : path;
++  }
++
++  function appendClient(formData) {
++    if (!formData.has('client')) {
++      formData.append('client', CLIENT_ID);
++    }
++    return formData;
++  }
++
++  async function fetchJson(url, options = {}) {
++    const opts = Object.assign({ credentials: 'include' }, options);
++    const response = await fetch(url, opts);
++    if (!response.ok) {
++      const text = await response.text();
++      throw new Error(text || `HTTP ${response.status}`);
++    }
++    const contentType = response.headers.get('content-type');
++    if (contentType && contentType.includes('application/json')) {
++      return response.json();
++    }
++    return {};
++  }
++
++  function apiGet(action, params = {}) {
++    const search = new URLSearchParams(params);
++    search.set('action', action);
++    search.set('client', CLIENT_ID);
++    return fetchJson(`${API_BASE}?${search.toString()}`);
++  }
++
++  function apiPost(action, formData) {
++    const fd = formData instanceof FormData ? formData : new FormData();
++    if (!fd.has('action')) {
++      fd.append('action', action);
++    } else {
++      fd.set('action', action);
++    }
++    appendClient(fd);
++    return fetchJson(API_BASE, { method: 'POST', body: fd });
++  }
++
++  function toast(message, duration = 3000) {
++    const element = document.createElement('div');
++    element.className = 'toast';
++    element.innerHTML = `<span>${message}</span><button type="button" aria-label="Cerrar">×</button>`;
++    element.querySelector('button').onclick = () => element.remove();
++    toastContainer.appendChild(element);
++    setTimeout(() => element.remove(), duration);
++  }
++
++  function startPolling(callback) {
++    stopPolling();
++    intervalId = window.setInterval(callback, 60000);
++  }
++
++  function stopPolling() {
++    if (intervalId !== null) {
++      window.clearInterval(intervalId);
++      intervalId = null;
++    }
++  }
++
++  function renderDocuments(items, containerId, hideActions) {
++    const container = document.getElementById(containerId);
++    if (!items || !items.length) {
++      container.innerHTML = '<p class="text-gray-500">No hay documentos.</p>';
++      return;
++    }
++    container.innerHTML = items.map((doc) => {
++      const codes = (doc.codes || []).join('\n');
++      const link = fileUrl(doc.path || '');
++      return `
++        <div class="border rounded p-4 bg-gray-50">
++          <div class="flex justify-between flex-wrap gap-3">
++            <div class="min-w-[200px]">
++              <h3 class="font-semibold text-lg">${doc.name}</h3>
++              <p class="text-gray-600">${doc.date}</p>
++              <p class="text-gray-600 text-sm break-all">Archivo: ${doc.path}</p>
++              <a href="${link}" target="_blank" class="text-indigo-600 underline">Ver PDF</a>
++            </div>
++            <div class="button-group text-right">
++              ${hideActions ? '' : `
++                <button data-action="edit" data-id="${doc.id}" class="btn btn--warning px-2 py-1 text-lg">Editar</button>
++                <button data-action="delete" data-id="${doc.id}" class="btn btn--primary px-2 py-1 text-lg">Eliminar</button>
++              `}
++              <button data-action="toggle" data-id="${doc.id}" class="btn btn--secondary px-2 py-1 text-lg">Ver Códigos</button>
++            </div>
++          </div>
++          <pre id="codes${doc.id}" class="mt-2 p-2 bg-white rounded hidden">${codes}</pre>
++        </div>
++      `;
++    }).join('');
++  }
++
++  function clearSearch() {
++    searchInput.value = '';
++    searchAlert.innerText = '';
++    resultsSearch.innerHTML = '';
++  }
++
++  function clearCode() {
++    resultsCode.innerHTML = '';
++  }
++
++  function clearConsultFilter() {
++    consultFilterInput.value = '';
++    resultsList.innerHTML = '';
++  }
++
++  function downloadCsv() {
++    let csv = 'Código,Documento\n';
++    fullList.forEach((doc) => {
++      (doc.codes || []).forEach((code) => {
++        csv += `${code},${doc.name}\n`;
++      });
++    });
++    const blob = new Blob([csv], { type: 'text/csv' });
++    const url = URL.createObjectURL(blob);
++    const a = document.createElement('a');
++    a.href = url;
++    a.download = 'documentos.csv';
++    a.click();
++    URL.revokeObjectURL(url);
++  }
++
++  function downloadPdfs() {
++    window.location.href = withClient(`${API_BASE}?action=download_pdfs`);
++  }
++
++  function toggleCodes(button) {
++    const id = button.dataset.id;
++    const pre = document.getElementById(`codes${id}`);
++    if (!pre) return;
++    if (pre.classList.contains('hidden')) {
++      pre.classList.remove('hidden');
++      button.textContent = 'Ocultar Códigos';
++      stopPolling();
++    } else {
++      pre.classList.add('hidden');
++      button.textContent = 'Ver Códigos';
++      startPolling(refreshDocuments);
++    }
++  }
++
++  async function deleteDoc(id) {
++    try {
++      const response = await apiGet('delete', { id });
++      toast(response.message || response.error || 'Operación completada');
++      await refreshDocuments();
++    } catch (error) {
++      toast(error.message || 'No se pudo eliminar el documento');
++    }
++  }
++
++  async function editDoc(id) {
++    const doc = fullList.find((item) => item.id === id);
++    if (!doc) return;
++    document.querySelector('[data-tab="tab-upload"]').click();
++    document.getElementById('docId').value = doc.id;
++    document.getElementById('name').value = doc.name;
++    document.getElementById('date').value = doc.date;
++    document.getElementById('codes').value = (doc.codes || []).join('\n');
++  }
++
++  async function doSearch() {
++    const raw = searchInput.value.trim();
++    if (!raw) return;
++    const codes = [...new Set(raw.split(/\r?\n/).map((line) => line.trim().split(/\s+/)[0]).filter(Boolean))];
++    const fd = new FormData();
++    fd.append('codes', codes.join('\n'));
++    try {
++      const data = await apiPost('search', fd);
++      const found = new Set(data.flatMap((item) => item.codes || []));
++      const missing = codes.filter((code) => !found.has(code));
++      searchAlert.innerText = missing.length ? `No encontrados: ${missing.join(', ')}` : '';
++      resultsSearch.innerHTML = '';
++      renderDocuments(data, 'results-search', true);
++    } catch (error) {
++      toast('No se pudo realizar la búsqueda');
++    }
++  }
++
++  async function doCodeSearch() {
++    const code = codeInput.value.trim();
++    if (!code) return;
++    const fd = new FormData();
++    fd.append('code', code);
++    try {
++      const data = await apiPost('search_by_code', fd);
++      resultsCode.innerHTML = '';
++      if (!data.length) {
++        resultsCode.innerHTML = '<p class="text-gray-500">No hay documentos.</p>';
++        return;
++      }
++      renderDocuments(data, 'results-code', true);
++    } catch (error) {
++      toast('No se pudo buscar el código');
++    }
++  }
++
++  function doConsultFilter() {
++    const term = consultFilterInput.value.trim().toLowerCase();
++    const filtered = fullList.filter((doc) => {
++      const name = doc.name ? doc.name.toLowerCase() : '';
++      const path = doc.path ? doc.path.toLowerCase() : '';
++      return name.includes(term) || path.includes(term);
++    });
++    renderDocuments(filtered, 'results-list', false);
++  }
++
++  async function refreshDocuments() {
++    try {
++      const response = await apiGet('list', { page: 1, per_page: 0 });
++      fullList = response.data || [];
++      const activeTab = document.querySelector('.tab.active');
++      if (activeTab && activeTab.dataset.tab === 'tab-list') {
++        const term = consultFilterInput.value.trim();
++        if (term) {
++          doConsultFilter();
++        } else {
++          renderDocuments(fullList, 'results-list', false);
++        }
++      }
++    } catch (error) {
++      toast('No se pudo obtener la lista de documentos');
++    }
++  }
++
++  function bindTabs() {
++    document.querySelectorAll('.tab').forEach((tab) => {
++      tab.addEventListener('click', () => {
++        document.querySelectorAll('.tab').forEach((item) => item.classList.remove('active'));
++        document.querySelectorAll('.tab-content').forEach((item) => item.classList.add('hidden'));
++        tab.classList.add('active');
++        document.getElementById(tab.dataset.tab).classList.remove('hidden');
++
++        if (tab.dataset.tab === 'tab-list') {
++          refreshDocuments();
++          startPolling(refreshDocuments);
++        } else {
++          stopPolling();
++        }
++
++        if (tab.dataset.tab === 'tab-search') {
++          clearSearch();
++        }
++        if (tab.dataset.tab === 'tab-code') {
++          clearCode();
++        }
++      });
++    });
++    const firstTab = document.querySelector('.tab.active');
++    if (firstTab) {
++      firstTab.click();
++    }
++  }
++
++  function bindDocumentActions() {
++    resultsList.addEventListener('click', (event) => {
++      const button = event.target.closest('button[data-action]');
++      if (!button) return;
++      const id = parseInt(button.dataset.id, 10);
++      if (!id) return;
++      if (button.dataset.action === 'edit') {
++        editDoc(id);
++      } else if (button.dataset.action === 'delete') {
++        pendingDeleteId = id;
++        deleteOverlay.classList.remove('hidden');
++        deleteKeyInput.value = '';
++        deleteKeyError.classList.add('hidden');
++        deleteKeyInput.focus();
++      } else if (button.dataset.action === 'toggle') {
++        toggleCodes(button);
++      }
++    });
++
++    resultsSearch.addEventListener('click', (event) => {
++      const button = event.target.closest('button[data-action]');
++      if (!button) return;
++      if (button.dataset.action === 'toggle') {
++        toggleCodes(button);
++      }
++    });
++
++    resultsCode.addEventListener('click', (event) => {
++      const button = event.target.closest('button[data-action]');
++      if (!button) return;
++      if (button.dataset.action === 'toggle') {
++        toggleCodes(button);
++      }
++    });
++  }
++
++  function bindUploadForm() {
++    uploadForm.addEventListener('submit', async (event) => {
++      event.preventDefault();
++      const fileInput = document.getElementById('file');
++      const file = fileInput.files[0];
++      if (file && file.size > 10 * 1024 * 1024) {
++        uploadWarning.classList.remove('hidden');
++        return;
++      }
++      uploadWarning.classList.add('hidden');
++
++      const formData = new FormData(uploadForm);
++      const action = formData.get('id') ? 'edit' : 'upload';
++
++      const codes = (formData.get('codes') || '').toString()
++        .split(/\r?\n/)
++        .map((value) => value.trim())
++        .filter(Boolean)
++        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
++      formData.set('codes', codes.join('\n'));
++
++      try {
++        const response = await apiPost(action, formData);
++        toast(response.message || response.error || 'Operación completada');
++        uploadForm.reset();
++        document.getElementById('docId').value = '';
++        await refreshDocuments();
++      } catch (error) {
++        toast('No se pudo guardar el documento');
++      }
++    });
++  }
++
++  function bindSearchInputs() {
++    btnDoSearch.addEventListener('click', doSearch);
++    btnClearSearch.addEventListener('click', clearSearch);
++    btnClearConsult.addEventListener('click', clearConsultFilter);
++    btnDownloadCsv.addEventListener('click', downloadCsv);
++    btnDownloadPdfs.addEventListener('click', downloadPdfs);
++    btnSearchCode.addEventListener('click', doCodeSearch);
++
++    consultFilterInput.addEventListener('input', doConsultFilter);
++
++    let timeoutId;
++    codeInput.addEventListener('input', () => {
++      window.clearTimeout(timeoutId);
++      const term = codeInput.value.trim();
++      if (!term) {
++        suggestions.classList.add('hidden');
++        return;
++      }
++      timeoutId = window.setTimeout(async () => {
++        try {
++          const suggestionList = await apiGet('suggest', { term });
++          if (!suggestionList.length) {
++            suggestions.classList.add('hidden');
++            return;
++          }
++          suggestions.innerHTML = suggestionList
++            .map((code) => `<div class="py-1 px-2 hover:bg-gray-100 cursor-pointer" data-code="${code}">${code}</div>`)
++            .join('');
++          suggestions.classList.remove('hidden');
++        } catch (error) {
++          suggestions.classList.add('hidden');
++        }
++      }, 200);
++    });
++
++    suggestions.addEventListener('touchmove', (event) => event.stopPropagation());
++    suggestions.addEventListener('click', (event) => {
++      const code = event.target.dataset.code;
++      if (!code) return;
++      codeInput.value = code;
++      suggestions.classList.add('hidden');
++      doCodeSearch();
++    });
++    codeInput.addEventListener('blur', () => {
++      window.setTimeout(() => suggestions.classList.add('hidden'), 100);
++    });
++  }
++
++  async function confirmDialog(message) {
++    confirmMsg.textContent = message;
++    confirmOverlay.classList.remove('hidden');
++    return new Promise((resolve) => {
++      const handle = (result) => {
++        confirmOverlay.classList.add('hidden');
++        confirmOk.removeEventListener('click', onOk);
++        confirmCancel.removeEventListener('click', onCancel);
++        resolve(result);
++      };
++      const onOk = () => handle(true);
++      const onCancel = () => handle(false);
++      confirmOk.addEventListener('click', onOk);
++      confirmCancel.addEventListener('click', onCancel);
++    });
++  }
++
++  function bindDeletionFlow() {
++    deleteKeyOk.addEventListener('click', async () => {
++      if (deleteKeyInput.value !== DELETION_KEY) {
++        deleteKeyError.classList.remove('hidden');
++        deleteKeyInput.value = '';
++        deleteKeyInput.focus();
++        return;
++      }
++      deleteKeyError.classList.add('hidden');
++      deleteOverlay.classList.add('hidden');
++      const confirmed = await confirmDialog('¿Eliminar este documento?');
++      if (!confirmed) return;
++      if (pendingDeleteId) {
++        await deleteDoc(pendingDeleteId);
++        pendingDeleteId = null;
++      }
++    });
++
++    deleteKeyCancel.addEventListener('click', () => {
++      deleteOverlay.classList.add('hidden');
++      deleteKeyInput.value = '';
++      deleteKeyError.classList.add('hidden');
++    });
++  }
++
++  function applyBranding(branding) {
++    if (!branding) return;
++    if (branding.name && brandHeading) {
++      brandHeading.textContent = branding.name;
++    }
++  }
++
++  async function initApp() {
++    if (initialized) return;
++    initialized = true;
++
++    applyBranding(BRAND_DATA);
++    bindTabs();
++    bindDocumentActions();
++    bindUploadForm();
++    bindSearchInputs();
++    bindDeletionFlow();
++
++    deleteOverlay.addEventListener('keydown', (event) => {
++      if (event.key === 'Escape') {
++        deleteOverlay.classList.add('hidden');
++      }
++    });
++
++    await refreshDocuments();
++    startPolling(refreshDocuments);
++  }
++
++  async function handleLogin(event) {
++    event.preventDefault();
++    const formData = new FormData(loginForm);
++    try {
++      const response = await apiPost('login', formData);
++      loginError.classList.add('hidden');
++      loginOverlay.classList.add('hidden');
++      mainContent.classList.remove('hidden');
++      applyBranding(response.branding || BRAND_DATA);
++      await initApp();
++      await refreshDocuments();
++      startPolling(refreshDocuments);
++    } catch (error) {
++      loginError.classList.remove('hidden');
++    }
++  }
++
++  async function handleLogout() {
++    try {
++      await apiPost('logout');
++    } catch (error) {
++      // ignore
++    }
++    stopPolling();
++    fullList = [];
++    pendingDeleteId = null;
++    mainContent.classList.add('hidden');
++    loginOverlay.classList.remove('hidden');
++  }
++
++  async function checkSession() {
++    try {
++      const response = await apiGet('session');
++      if (response.logged_in) {
++        loginOverlay.classList.add('hidden');
++        mainContent.classList.remove('hidden');
++        await initApp();
++        return;
++      }
++    } catch (error) {
++      // ignore
++    }
++    loginOverlay.classList.remove('hidden');
++    mainContent.classList.add('hidden');
++  }
++
++  loginForm.addEventListener('submit', handleLogin);
++  logoutBtn.addEventListener('click', handleLogout);
++
++  checkSession();
++})();
+diff --git a/templates/bc-base/.htaccess b/templates/bc-base/.htaccess
+new file mode 100644
+index 0000000000000000000000000000000000000000..27e5c8523f59feb9712c3e4d0d193b6d30ea1dad
+--- /dev/null
++++ b/templates/bc-base/.htaccess
+@@ -0,0 +1,3 @@
++RewriteEngine On
++RewriteBase /bc/__CLIENT_SLUG__/
++RewriteRule ^$ index.php [L]
+diff --git a/templates/bc-base/index.php b/templates/bc-base/index.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..a74fac45f22c4eac0b8dd07649d61b87cd08723e
+--- /dev/null
++++ b/templates/bc-base/index.php
+@@ -0,0 +1,134 @@
++<?php
++declare(strict_types=1);
++
++$rootPath = dirname(__DIR__, 2);
++$config   = require $rootPath . '/clientes/__CLIENT_SLUG__/config.php';
++$branding = $config['branding'] ?? [];
++if (!is_array($branding)) {
++    $branding = [];
++}
++
++$brandName = $branding['client_name'] ?? $branding['name'] ?? $config['BRAND_NAME'] ?? 'Portal de Documentos';
++$logoPath  = $branding['logo_path'] ?? $branding['logo'] ?? $config['BRAND_LOGO'] ?? null;
++$colors    = $branding['colors'] ?? $config['BRAND_COLORS'] ?? [];
++if (!is_array($colors)) {
++    $colors = [];
++}
++
++$primary       = $colors['primary'] ?? '#F87171';
++$primaryHover  = $colors['primary_hover'] ?? '#DC2626';
++$onDark        = $colors['on_dark'] ?? '#FFFFFF';
++$onLight       = $colors['on_light'] ?? '#1F2937';
++
++$logoUrl = $logoPath ? '../../' . ltrim($logoPath, '/') : null;
++?>
++<!DOCTYPE html>
++<html lang="es" data-client="__CLIENT_SLUG__">
++<head>
++  <meta charset="UTF-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++  <script src="https://cdn.tailwindcss.com"></script>
++  <title><?php echo htmlspecialchars($brandName); ?> – Portal Público</title>
++  <style>
++    :root {
++      --color-primary: <?php echo $primary; ?>;
++      --color-primary-hover: <?php echo $primaryHover; ?>;
++      --color-on-dark: <?php echo $onDark; ?>;
++      --color-on-light: <?php echo $onLight; ?>;
++    }
++    .relative { position: relative; }
++    #suggestions {
++      position: absolute;
++      top: 100%;
++      left: 0;
++      right: 0;
++      background: white;
++      border: 1px solid #e5e7eb;
++      border-top: none;
++      border-radius: 0 0 .375rem .375rem;
++      max-height: 12rem;
++      overflow-y: auto;
++      -webkit-overflow-scrolling: touch;
++      display: none;
++      z-index: 9999;
++    }
++    #suggestions div:hover { background-color: #f3f4f6; }
++    .btn-primary {
++      background: var(--color-primary);
++      color: var(--color-on-dark);
++      transition: background-color 0.2s ease;
++    }
++    .btn-primary:hover {
++      background: var(--color-primary-hover);
++    }
++    .btn-secondary {
++      background: #e5e7eb;
++      color: var(--color-on-light);
++      transition: background-color 0.2s ease;
++    }
++    .btn-secondary:hover {
++      background: #d1d5db;
++    }
++  </style>
++  <script>
++    window.__CLIENT_BRANDING__ = <?php echo json_encode([
++        'name' => $brandName,
++        'logo' => $logoUrl,
++        'colors' => [
++            'primary'       => $primary,
++            'primary_hover' => $primaryHover,
++        ],
++    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
++  </script>
++  <script defer src="script.js"></script>
++</head>
++<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-start p-4 sm:p-6">
++  <div class="w-full max-w-3xl bg-white rounded-2xl shadow-lg overflow-visible">
++    <div class="px-6 pt-6 pb-4 text-center">
++      <?php if ($logoUrl): ?>
++        <img src="<?php echo htmlspecialchars($logoUrl); ?>" alt="Logo <?php echo htmlspecialchars($brandName); ?>" class="mx-auto h-20 sm:h-24 mb-6" />
++      <?php endif; ?>
++      <h1 class="text-2xl sm:text-3xl font-bold mb-3" id="brandTitle"><?php echo htmlspecialchars($brandName); ?></h1>
++      <p class="text-gray-700 text-sm sm:text-base mb-2 leading-relaxed">Consulta los documentos disponibles ingresando el código del producto.</p>
++    </div>
++
++    <div class="border-t">
++      <div class="p-6 sm:p-8">
++        <h2 class="text-2xl sm:text-3xl font-semibold mb-4">Búsqueda por Código</h2>
++        <div class="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4">
++          <div class="relative flex-1">
++            <input
++              id="codeInput"
++              type="text"
++              placeholder="Código a buscar"
++              class="w-full sm:flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
++            />
++            <div id="suggestions"></div>
++          </div>
++          <button id="btnCodeSearch" class="btn-primary w-full sm:w-auto px-6 py-2 rounded-lg text-center font-semibold">Buscar</button>
++          <button id="btnCodeClear" class="btn-secondary w-full sm:w-auto px-6 py-2 rounded-lg text-center font-semibold">Limpiar</button>
++        </div>
++        <div id="code-alert" class="mb-4 text-red-600 font-medium"></div>
++        <div id="results-code" class="space-y-4"></div>
++      </div>
++    </div>
++  </div>
++
++  <footer class="w-full max-w-3xl mt-6 text-center text-gray-600 text-sm">
++    <p class="mb-1">Portal administrado por <?php echo htmlspecialchars($brandName); ?>.</p>
++    <div class="mt-4">
++      <button id="btnLegal" class="text-[var(--color-primary)] hover:underline font-medium">Aviso Legal</button>
++    </div>
++  </footer>
++
++  <div id="legalModal" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center hidden">
++    <div class="bg-white max-w-md w-full p-6 rounded-xl shadow-lg relative">
++      <button id="btnCloseLegal" class="absolute top-2 right-3 text-gray-500 hover:text-[var(--color-primary)] text-xl">&times;</button>
++      <h2 class="text-lg font-bold text-gray-800 mb-3">Aviso Legal</h2>
++      <p class="text-sm text-gray-700 leading-relaxed">
++        Los documentos disponibles en este portal son propiedad de <strong><?php echo htmlspecialchars($brandName); ?></strong> y están destinados exclusivamente a consulta. Cualquier uso no autorizado será sancionado conforme a la legislación vigente.
++      </p>
++    </div>
++  </div>
++</body>
++</html>
+diff --git a/templates/bc-base/script.js b/templates/bc-base/script.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..25dda375bb0486cf677f92ad573dc4b7a1fc7e50
+--- /dev/null
++++ b/templates/bc-base/script.js
+@@ -0,0 +1,144 @@
++(() => {
++  const CLIENT_ID = document.documentElement.dataset.client;
++  const API_BASE = '../../api.php';
++  const BRAND_DATA = window.__CLIENT_BRANDING__ || {};
++
++  const codeInput = document.getElementById('codeInput');
++  const suggestions = document.getElementById('suggestions');
++  const results = document.getElementById('results-code');
++  const alertBox = document.getElementById('code-alert');
++  const btnSearch = document.getElementById('btnCodeSearch');
++  const btnClear = document.getElementById('btnCodeClear');
++  const btnLegal = document.getElementById('btnLegal');
++  const btnCloseLegal = document.getElementById('btnCloseLegal');
++  const legalModal = document.getElementById('legalModal');
++  const brandTitle = document.getElementById('brandTitle');
++
++  function withClient(url) {
++    const separator = url.includes('?') ? '&' : '?';
++    return `${url}${separator}client=${encodeURIComponent(CLIENT_ID)}`;
++  }
++
++  function fileUrl(path) {
++    if (!path) return '#';
++    return path.startsWith('uploads/') ? `../../${path}` : path;
++  }
++
++  async function fetchJson(url, options = {}) {
++    const opts = Object.assign({ credentials: 'include' }, options);
++    const response = await fetch(url, opts);
++    if (!response.ok) {
++      throw new Error(`HTTP ${response.status}`);
++    }
++    return response.json();
++  }
++
++  function applyBranding() {
++    if (BRAND_DATA.name && brandTitle) {
++      brandTitle.textContent = BRAND_DATA.name;
++    }
++  }
++
++  async function fetchSuggestions(term) {
++    try {
++      const data = await fetchJson(withClient(`${API_BASE}?action=suggest&term=${encodeURIComponent(term)}`));
++      if (!data.length) {
++        suggestions.style.display = 'none';
++        return;
++      }
++      suggestions.innerHTML = data.map((code) => `<div class="px-4 py-2 cursor-pointer" data-code="${code}">${code}</div>`).join('');
++      suggestions.style.display = 'block';
++    } catch (error) {
++      suggestions.style.display = 'none';
++    }
++  }
++
++  async function searchByCode(code) {
++    const fd = new FormData();
++    fd.append('action', 'search_by_code');
++    fd.append('client', CLIENT_ID);
++    fd.append('code', code);
++    const data = await fetchJson(API_BASE, { method: 'POST', body: fd });
++    return data;
++  }
++
++  function renderResults(items) {
++    if (!items.length) {
++      results.innerHTML = '<p class="text-gray-500">No hay documentos para este código.</p>';
++      return;
++    }
++    results.innerHTML = items.map((doc) => {
++      const link = fileUrl(doc.path || '');
++      return `
++        <div class="border rounded-lg p-4 bg-white shadow-sm">
++          <h3 class="font-semibold text-lg truncate">${doc.name}</h3>
++          <p class="text-sm text-gray-600 mt-1 truncate">${doc.date}</p>
++          <p class="text-xs text-gray-500 italic mt-0.5 break-all">${doc.path}</p>
++          <a href="${link}" target="_blank" class="text-[var(--color-primary)] hover:underline mt-1 inline-block font-semibold">Ver PDF</a>
++        </div>
++      `;
++    }).join('');
++  }
++
++  async function handleSearch() {
++    const code = codeInput.value.trim();
++    alertBox.innerText = '';
++    results.innerHTML = '';
++    if (!code) {
++      return;
++    }
++    try {
++      const data = await searchByCode(code);
++      if (!data.length) {
++        alertBox.innerText = `No hay documentos con “${code}”.`;
++        return;
++      }
++      renderResults(data);
++    } catch (error) {
++      alertBox.innerText = 'No se pudo completar la búsqueda.';
++    }
++  }
++
++  function handleClear() {
++    codeInput.value = '';
++    alertBox.innerText = '';
++    results.innerHTML = '';
++    suggestions.style.display = 'none';
++  }
++
++  function toggleLegalModal() {
++    legalModal.classList.toggle('hidden');
++  }
++
++  let timeoutId;
++  codeInput.addEventListener('input', () => {
++    window.clearTimeout(timeoutId);
++    const term = codeInput.value.trim();
++    if (!term) {
++      suggestions.style.display = 'none';
++      return;
++    }
++    timeoutId = window.setTimeout(() => fetchSuggestions(term), 200);
++  });
++
++  suggestions.addEventListener('click', (event) => {
++    const code = event.target.dataset.code;
++    if (!code) return;
++    codeInput.value = code;
++    suggestions.style.display = 'none';
++    handleSearch();
++  });
++
++  codeInput.addEventListener('blur', () => {
++    window.setTimeout(() => {
++      suggestions.style.display = 'none';
++    }, 100);
++  });
++
++  btnSearch.addEventListener('click', handleSearch);
++  btnClear.addEventListener('click', handleClear);
++  btnLegal.addEventListener('click', toggleLegalModal);
++  btnCloseLegal.addEventListener('click', toggleLegalModal);
++
++  applyBranding();
++})();
+diff --git a/uploads/.gitignore b/uploads/.gitignore
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6b7ef32c8478a48c3994dcadc86837f4371184d
+--- /dev/null
++++ b/uploads/.gitignore
+@@ -0,0 +1,2 @@
++*
++!.gitignore
+ 
+EOF
+)

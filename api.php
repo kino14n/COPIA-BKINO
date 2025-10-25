@@ -1,22 +1,29 @@
-<?php 
-// api.php
+<?php
+declare(strict_types=1);
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
-// —————————————————————————————
-// Cabecera y configuración multi-cliente
-// —————————————————————————————
 header('Content-Type: application/json');
+session_start();
 
-function respondError(string $message, int $statusCode = 400): void {
+if (!function_exists('str_starts_with')) {
+    function str_starts_with(string $haystack, string $needle): bool
+    {
+        return $needle === '' || strncmp($haystack, $needle, strlen($needle)) === 0;
+    }
+}
+
+function respondError(string $message, int $statusCode = 400): void
+{
     http_response_code($statusCode);
-    echo json_encode(['error' => $message]);
+    echo json_encode(['error' => $message], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-function sanitizeSlug(?string $slug): ?string {
+function sanitizeSlug(?string $slug): ?string
+{
     if ($slug === null) {
         return null;
     }
@@ -28,7 +35,8 @@ function sanitizeSlug(?string $slug): ?string {
     return $slug ?: null;
 }
 
-function detectClientSlug(): string {
+function detectClientSlug(): string
+{
     $candidates = [];
 
     if (isset($_REQUEST['client'])) {
@@ -36,7 +44,7 @@ function detectClientSlug(): string {
     }
 
     $headers = [
-        $_SERVER['HTTP_X_CLIENT']      ?? null,
+        $_SERVER['HTTP_X_CLIENT'] ?? null,
         $_SERVER['HTTP_X_CLIENT_SLUG'] ?? null,
     ];
     $candidates = array_merge($candidates, $headers);
@@ -64,6 +72,11 @@ function detectClientSlug(): string {
     respondError('Cliente no especificado o slug inválido', 400);
 }
 
+function arrayAccessible(mixed $value): bool
+{
+    return is_array($value) || $value instanceof ArrayAccess;
+}
+
 $clientSlug = detectClientSlug();
 $configPath = __DIR__ . '/clientes/' . $clientSlug . '/config.php';
 if (!is_file($configPath)) {
@@ -71,29 +84,42 @@ if (!is_file($configPath)) {
 }
 
 $config = require $configPath;
-if (!is_array($config)) {
+if (!arrayAccessible($config)) {
     respondError('Configuración del cliente inválida', 500);
 }
 
-$requiredKeys = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS'];
-foreach ($requiredKeys as $key) {
-    if (!array_key_exists($key, $config) || $config[$key] === '') {
-        respondError("Falta la clave obligatoria {$key} en la configuración del cliente", 500);
+$dbConfig = [];
+if (isset($config['db']) && arrayAccessible($config['db'])) {
+    $dbConfig = $config['db'];
+} else {
+    $dbConfig = [
+        'host'    => $config['DB_HOST'] ?? null,
+        'port'    => $config['DB_PORT'] ?? null,
+        'dbname'  => $config['DB_NAME'] ?? null,
+        'user'    => $config['DB_USER'] ?? null,
+        'pass'    => $config['DB_PASS'] ?? null,
+        'charset' => $config['DB_CHARSET'] ?? null,
+    ];
+}
+
+foreach (['host', 'dbname', 'user', 'pass'] as $requiredKey) {
+    if (!isset($dbConfig[$requiredKey]) || $dbConfig[$requiredKey] === '') {
+        respondError('Falta la configuración de base de datos: ' . $requiredKey, 500);
     }
 }
 
-$dbCharset = $config['DB_CHARSET'] ?? 'utf8mb4';
-$dbPort    = (int)($config['DB_PORT'] ?? 3306);
+$dbCharset = $dbConfig['charset'] ?? 'utf8mb4';
+$dbPort    = (int)($dbConfig['port'] ?? 3306);
 $dsn = sprintf(
     'mysql:host=%s;port=%d;dbname=%s;charset=%s',
-    $config['DB_HOST'],
+    $dbConfig['host'],
     $dbPort,
-    $config['DB_NAME'],
+    $dbConfig['dbname'],
     $dbCharset
 );
 
 try {
-    $db = new PDO($dsn, $config['DB_USER'], $config['DB_PASS'], [
+    $db = new PDO($dsn, (string)$dbConfig['user'], (string)$dbConfig['pass'], [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
@@ -101,11 +127,35 @@ try {
     respondError('Error de conexión: ' . $e->getMessage(), 500);
 }
 
+$brandingSource = $config['branding'] ?? $config['BRANDING'] ?? [];
+if (!arrayAccessible($brandingSource)) {
+    $brandingSource = [];
+}
+
+$brandingColors = $brandingSource['colors'] ?? $config['BRAND_COLORS'] ?? [];
+if (!arrayAccessible($brandingColors)) {
+    $brandingColors = [];
+}
+
 $branding = [
-    'name'   => $config['BRAND_NAME']   ?? null,
-    'logo'   => $config['BRAND_LOGO']   ?? null,
-    'colors' => $config['BRAND_COLORS'] ?? [],
+    'name'   => $brandingSource['client_name'] ?? $brandingSource['name'] ?? $config['BRAND_NAME'] ?? null,
+    'logo'   => $brandingSource['logo_path'] ?? $brandingSource['logo'] ?? $config['BRAND_LOGO'] ?? null,
+    'colors' => $brandingColors,
 ];
+
+$adminSource = $config['admin'] ?? [];
+if (!arrayAccessible($adminSource)) {
+    $adminSource = [];
+}
+
+$adminUser      = $adminSource['user'] ?? $config['ADMIN_USER'] ?? null;
+$adminPassHash  = $adminSource['pass_hash'] ?? $config['ADMIN_PASS_HASH'] ?? null;
+$adminPassPlain = $adminSource['pass_plain'] ?? $config['ADMIN_PASS'] ?? null;
+
+$pdfHighlighterUrl = $config['pdf_highlighter_url'] ?? $config['PDF_HIGHLIGHTER_URL'] ?? null;
+if ($pdfHighlighterUrl) {
+    $branding['pdf_highlighter_url'] = $pdfHighlighterUrl;
+}
 
 $uploadsRootDir   = __DIR__ . '/uploads';
 $clientUploadsDir = $uploadsRootDir . '/' . $clientSlug;
@@ -123,7 +173,7 @@ function resolveUploadFullPath(?string $storedPath, string $clientSlug): ?string
     if (!$storedPath) {
         return null;
     }
-    if (strpos($storedPath, 'uploads/') === 0) {
+    if (str_starts_with($storedPath, 'uploads/')) {
         return __DIR__ . '/' . $storedPath;
     }
 
@@ -132,7 +182,8 @@ function resolveUploadFullPath(?string $storedPath, string $clientSlug): ?string
         return $candidate;
     }
 
-    return __DIR__ . '/uploads/' . ltrim($storedPath, '/');
+    $fallback = __DIR__ . '/uploads/' . ltrim($storedPath, '/');
+    return file_exists($fallback) ? $fallback : null;
 }
 
 function normalizeDocumentPath(?string $storedPath, string $clientSlug): ?string
@@ -141,308 +192,381 @@ function normalizeDocumentPath(?string $storedPath, string $clientSlug): ?string
         return $storedPath;
     }
 
-    if (strpos($storedPath, 'uploads/') === 0) {
+    if (str_starts_with($storedPath, 'uploads/')) {
         return $storedPath;
     }
 
     return buildStoredUploadPath($storedPath, $clientSlug);
 }
 
-$action = $_REQUEST['action'] ?? '';
-
-switch ($action) {
-
-  // —— AUTOCOMPLETE SUGGEST ——  
-  case 'suggest':
-    $term = trim($_GET['term'] ?? '');
-    if ($term === '') {
-      echo json_encode([]);
-      exit;
-    }
-    $stmt = $db->prepare("
-      SELECT DISTINCT code 
-      FROM codes 
-      WHERE code LIKE ? 
-      ORDER BY code ASC 
-      LIMIT 10
-    ");
-    $stmt->execute([$term . '%']);
-    $codes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-    echo json_encode($codes);
-    break;
-
-  // —— SUBIR NUEVO DOCUMENTO ——  
-  case 'upload':
-    $name  = $_POST['name'];
-    $date  = $_POST['date'];
-    $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
-    $file  = $_FILES['file'];
-    $filename = time().'_'.basename($file['name']);
-    $storedPath  = buildStoredUploadPath($filename, $clientSlug);
-    $destination = __DIR__ . '/' . $storedPath;
-    if (!move_uploaded_file($file['tmp_name'], $destination)) {
-      respondError('No se pudo subir el PDF', 500);
-    }
-    $db->prepare('INSERT INTO documents (name,date,path) VALUES (?,?,?)')
-       ->execute([$name,$date,$storedPath]);
-    $docId = $db->lastInsertId();
-    $ins = $db->prepare('INSERT INTO codes (document_id,code) VALUES (?,?)');
-    foreach (array_unique($codes) as $c) {
-      $ins->execute([$docId,$c]);
-    }
-    echo json_encode(['message'=>'Documento guardado']);
-    break;
-
-  // —— LISTAR CON PAGINACIÓN ——  
-  case 'list':
-    $page    = max(1,(int)($_GET['page'] ?? 1));
-    $perPage = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 50;
-    $total   = (int)$db->query("SELECT COUNT(*) FROM documents")->fetchColumn();
-
-    if ($perPage === 0) {
-      $stmt = $db->query("
-        SELECT d.id,d.name,d.date,d.path,
-               GROUP_CONCAT(c.code SEPARATOR '\n') AS codes
-        FROM documents d
-        LEFT JOIN codes c ON d.id=c.document_id
-        GROUP BY d.id
-        ORDER BY d.date DESC
-      ");
-      $rows = $stmt->fetchAll();
-      $lastPage = 1;
-      $page = 1;
-    } else {
-      $perPage = max(1, min(50, $perPage));
-      $offset  = ($page - 1) * $perPage;
-      $lastPage = (int)ceil($total / $perPage);
-
-      $stmt = $db->prepare("
-        SELECT d.id,d.name,d.date,d.path,
-               GROUP_CONCAT(c.code SEPARATOR '\n') AS codes
-        FROM documents d
-        LEFT JOIN codes c ON d.id=c.document_id
-        GROUP BY d.id
-        ORDER BY d.date DESC
-        LIMIT :l OFFSET :o
-      ");
-      $stmt->bindValue(':l',$perPage,PDO::PARAM_INT);
-      $stmt->bindValue(':o',$offset ,PDO::PARAM_INT);
-      $stmt->execute();
-      $rows = $stmt->fetchAll();
-    }
-
-    $docs = array_map(function($r) use ($clientSlug){
-      return [
-        'id'    => (int)$r['id'],
-        'name'  => $r['name'],
-        'date'  => $r['date'],
-        'path'  => normalizeDocumentPath($r['path'], $clientSlug),
-        'codes' => $r['codes'] ? explode("\n",$r['codes']) : []
-      ];
-    }, $rows);
-
-    echo json_encode([
-      'total'     => $total,
-      'page'      => $page,
-      'per_page'  => $perPage,
-      'last_page' => $lastPage,
-      'data'      => $docs
-    ]);
-    break;
-
-  // —— BÚSQUEDA INTELIGENTE VORAZ ——  
-  case 'search':
-    $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
-    if (empty($codes)) {
-      echo json_encode([]);
-      exit;
-    }
-
-   // Usar UPPER para insensibilidad a mayúsculas/minúsculas
-  $cond = implode(" OR ", array_fill(0, count($codes), "UPPER(c.code) = UPPER(?)"));
-  $stmt = $db->prepare("
-    SELECT d.id,d.name,d.date,d.path,c.code
-    FROM documents d
-    JOIN codes c ON d.id=c.document_id
-    WHERE $cond
-  ");
-  $stmt->execute($codes);
-  $rows = $stmt->fetchAll();
-
-    $docs = [];
-    foreach ($rows as $r) {
-      $id = (int)$r['id'];
-      if (!isset($docs[$id])) {
-        $docs[$id] = [
-          'id'    => $id,
-          'name'  => $r['name'],
-          'date'  => $r['date'],
-          'path'  => normalizeDocumentPath($r['path'], $clientSlug),
-          'codes' => []
-        ];
-      }
-      if (!in_array($r['code'], $docs[$id]['codes'], true)) {
-        $docs[$id]['codes'][] = $r['code'];
-      }
-    }
-
-    $remaining = $codes;
-    $selected  = [];
-    while ($remaining) {
-      $best      = null;
-      $bestCover = [];
-      foreach ($docs as $d) {
-        $cover = array_intersect($d['codes'], $remaining);
-        if (!$best
-            || count($cover) > count($bestCover)
-            || (count($cover) === count($bestCover) && $d['date'] > $best['date'])
-        ) {
-          $best      = $d;
-          $bestCover = $cover;
-        }
-      }
-      if (!$best || empty($bestCover)) break;
-      $selected[] = $best;
-      $remaining = array_diff($remaining, $bestCover);
-      unset($docs[$best['id']]);
-    }
-
-    echo json_encode(array_values($selected));
-    break;
-
-  // —— ACCIÓN: DESCARGAR TODOS LOS PDFS EN ZIP ——  
-  case 'download_pdfs':
-    $uploadsDir = $clientUploadsDir;
-    if (!is_dir($uploadsDir)) {
-      respondError('Carpeta uploads del cliente no encontrada', 404);
-    }
-
-    // Crear ZIP en tmp
-    $tmpFile = tempnam(sys_get_temp_dir(), 'zip');
-    $zip = new ZipArchive();
-    if ($zip->open($tmpFile, ZipArchive::CREATE) !== TRUE) {
-      respondError('No se pudo crear el ZIP', 500);
-    }
-
-    // Agregar recursivamente todos los archivos de uploads
-    $files = new RecursiveIteratorIterator(
-      new RecursiveDirectoryIterator($uploadsDir),
-      RecursiveIteratorIterator::LEAVES_ONLY
-    );
-    foreach ($files as $file) {
-      if (!$file->isDir()) {
-        $filePath     = $file->getRealPath();
-        $relativePath = substr($filePath, strlen($uploadsDir) + 1);
-        $zip->addFile($filePath, $relativePath);
-      }
-    }
-    $zip->close();
-
-    // Cabeceras para descarga ZIP
-    header('Content-Type: application/zip');
-    header('Content-Disposition: attachment; filename="uploads_'.$clientSlug.'_'.date('Ymd_His').'.zip"');
-
-    // Enviar contenido
-    readfile($tmpFile);
-    unlink($tmpFile);
-    exit;
-
-  // —— EDITAR DOCUMENTO ——  
-  case 'edit':
-    $id   = (int)$_POST['id'];
-    $name = $_POST['name'];
-    $date = $_POST['date'];
-    $codes= array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
-    if (!empty($_FILES['file']['tmp_name'])) {
-      $old = $db->prepare('SELECT path FROM documents WHERE id=?');
-      $old->execute([$id]);
-      $oldPath = $old->fetchColumn();
-      if ($oldPath) {
-        $fullOldPath = resolveUploadFullPath($oldPath, $clientSlug);
-        if ($fullOldPath) {
-          @unlink($fullOldPath);
-        }
-      }
-      $fn = time().'_'.basename($_FILES['file']['name']);
-      $storedPath = buildStoredUploadPath($fn, $clientSlug);
-      $fullPath   = __DIR__ . '/' . $storedPath;
-      if (!move_uploaded_file($_FILES['file']['tmp_name'], $fullPath)) {
-        respondError('No se pudo subir el PDF actualizado', 500);
-      }
-      $db->prepare('UPDATE documents SET name=?,date=?,path=? WHERE id=?')
-         ->execute([$name,$date,$storedPath,$id]);
-    } else {
-      $db->prepare('UPDATE documents SET name=?,date=? WHERE id=?')
-         ->execute([$name,$date,$id]);
-    }
-    $db->prepare('DELETE FROM codes WHERE document_id=?')->execute([$id]);
-    $ins = $db->prepare('INSERT INTO codes (document_id,code) VALUES (?,?)');
-    foreach (array_unique($codes) as $c) {
-      $ins->execute([$id,$c]);
-    }
-    echo json_encode(['message'=>'Documento actualizado']);
-    break;
-
-    if (!$id || !$name || !$date) {
-  echo json_encode(['error' => 'Faltan campos obligatorios']);
-  exit;
+function isAdminSessionValid(string $clientSlug): bool
+{
+    return isset($_SESSION['user_logged_in'], $_SESSION['client_id'])
+        && $_SESSION['user_logged_in'] === true
+        && $_SESSION['client_id'] === $clientSlug;
 }
 
-  // —— ELIMINAR DOCUMENTO ——  
-  case 'delete':
-    $id = (int)($_GET['id'] ?? 0);
-    $old = $db->prepare('SELECT path FROM documents WHERE id=?');
-    $old->execute([$id]);
-    $oldPath = $old->fetchColumn();
-    if ($oldPath) {
-      $fullPath = resolveUploadFullPath($oldPath, $clientSlug);
-      if ($fullPath) {
-        @unlink($fullPath);
-      }
+function requireAdminSession(string $clientSlug): void
+{
+    if (!isAdminSessionValid($clientSlug)) {
+        respondError('No autorizado', 401);
     }
-    $db->prepare('DELETE FROM codes WHERE document_id=?')->execute([$id]);
-    $db->prepare('DELETE FROM documents WHERE id=?')->execute([$id]);
-    echo json_encode(['message'=>'Documento eliminado']);
-    break;
+}
 
-// —— BÚSQUEDA POR CÓDIGO ——  
-case 'search_by_code':
-  $code = trim($_POST['code'] ?? $_GET['code'] ?? '');
-  if (!$code) {
-    echo json_encode([]);
-    exit;
-  }
+$action = $_REQUEST['action'] ?? '';
+$adminOnlyActions = ['upload', 'list', 'edit', 'delete', 'download_pdfs', 'highlight_pdf'];
+if (in_array($action, $adminOnlyActions, true)) {
+    requireAdminSession($clientSlug);
+}
 
-  // Trae todos los códigos asociados al documento donde existe el código buscado (insensible a mayúsculas)
-  $stmt = $db->prepare("
-    SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c2.code SEPARATOR '\n') AS codes
-    FROM documents d
-    JOIN codes c1 ON d.id = c1.document_id
-    LEFT JOIN codes c2 ON d.id = c2.document_id
-    WHERE UPPER(c1.code) = UPPER(?)
-    GROUP BY d.id
-  ");
-  $stmt->execute([$code]);
-  $rows = $stmt->fetchAll();
+switch ($action) {
+    case 'login':
+        $user = trim($_POST['user'] ?? '');
+        $pass = (string)($_POST['pass'] ?? '');
 
-  $docs = array_map(function($r) use ($clientSlug){
-    return [
-      'id'    => (int)$r['id'],
-      'name'  => $r['name'],
-      'date'  => $r['date'],
-      'path'  => normalizeDocumentPath($r['path'], $clientSlug),
-      'codes' => $r['codes'] ? explode("\n", $r['codes']) : []
-    ];
-  }, $rows);
+        if ($adminUser === null || $adminUser === '') {
+            respondError('Login no configurado para este cliente', 500);
+        }
 
-  echo json_encode($docs);
-  break;
+        if ($user === '' || $pass === '') {
+            respondError('Credenciales incompletas', 400);
+        }
 
-  case 'branding':
-    echo json_encode($branding);
-    break;
+        if (!hash_equals($adminUser, $user)) {
+            respondError('Credenciales inválidas', 401);
+        }
 
-  default:
-    echo json_encode(['error'=>'Acción inválida']);
-    break;
+        $authenticated = false;
+        if ($adminPassHash && password_verify($pass, $adminPassHash)) {
+            $authenticated = true;
+        }
+        if (!$authenticated && $adminPassPlain !== null) {
+            $authenticated = hash_equals($adminPassPlain, $pass);
+        }
+        if (!$authenticated) {
+            respondError('Credenciales inválidas', 401);
+        }
+
+        session_regenerate_id(true);
+        $_SESSION['user_logged_in'] = true;
+        $_SESSION['client_id']     = $clientSlug;
+        $_SESSION['username']      = $adminUser;
+
+        echo json_encode([
+            'success'  => true,
+            'user'     => $adminUser,
+            'branding' => $branding,
+        ]);
+        break;
+
+    case 'logout':
+        $_SESSION = [];
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy();
+        }
+        echo json_encode(['success' => true]);
+        break;
+
+    case 'session':
+        echo json_encode([
+            'logged_in' => isAdminSessionValid($clientSlug),
+            'user'      => $_SESSION['username'] ?? null,
+        ]);
+        break;
+
+    case 'suggest':
+        $term = trim($_GET['term'] ?? '');
+        if ($term === '') {
+            echo json_encode([]);
+            break;
+        }
+
+        $stmt = $db->prepare(
+            'SELECT DISTINCT code FROM codes WHERE code LIKE ? ORDER BY code ASC LIMIT 10'
+        );
+        $stmt->execute([$term . '%']);
+        $codes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        echo json_encode($codes);
+        break;
+
+    case 'upload':
+        $name  = $_POST['name'] ?? '';
+        $date  = $_POST['date'] ?? '';
+        $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
+        $file  = $_FILES['file'] ?? null;
+
+        if (!$name || !$date || !$file) {
+            respondError('Faltan datos obligatorios para subir el documento');
+        }
+
+        $filename   = time() . '_' . basename($file['name']);
+        $storedPath = buildStoredUploadPath($filename, $clientSlug);
+        $destination = __DIR__ . '/' . $storedPath;
+        if (!move_uploaded_file($file['tmp_name'], $destination)) {
+            respondError('No se pudo subir el PDF', 500);
+        }
+
+        $db->prepare('INSERT INTO documents (name, date, path) VALUES (?,?,?)')
+            ->execute([$name, $date, $storedPath]);
+        $docId = (int)$db->lastInsertId();
+
+        $ins = $db->prepare('INSERT INTO codes (document_id, code) VALUES (?, ?)');
+        foreach (array_unique($codes) as $c) {
+            $ins->execute([$docId, $c]);
+        }
+
+        echo json_encode(['message' => 'Documento guardado']);
+        break;
+
+    case 'list':
+        $page    = max(1, (int)($_GET['page'] ?? 1));
+        $perPage = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 50;
+        $total   = (int)$db->query('SELECT COUNT(*) FROM documents')->fetchColumn();
+
+        if ($perPage === 0) {
+            $stmt = $db->query(
+                'SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c.code SEPARATOR "\n") AS codes
+                 FROM documents d
+                 LEFT JOIN codes c ON d.id = c.document_id
+                 GROUP BY d.id
+                 ORDER BY d.date DESC'
+            );
+            $rows = $stmt->fetchAll();
+            $lastPage = 1;
+            $page     = 1;
+        } else {
+            $perPage = max(1, min(50, $perPage));
+            $offset  = ($page - 1) * $perPage;
+            $lastPage = (int)ceil($total / $perPage);
+
+            $stmt = $db->prepare(
+                'SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c.code SEPARATOR "\n") AS codes
+                 FROM documents d
+                 LEFT JOIN codes c ON d.id = c.document_id
+                 GROUP BY d.id
+                 ORDER BY d.date DESC
+                 LIMIT :l OFFSET :o'
+            );
+            $stmt->bindValue(':l', $perPage, PDO::PARAM_INT);
+            $stmt->bindValue(':o', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            $rows = $stmt->fetchAll();
+        }
+
+        $docs = array_map(
+            function (array $r) use ($clientSlug) {
+                return [
+                    'id'    => (int)$r['id'],
+                    'name'  => $r['name'],
+                    'date'  => $r['date'],
+                    'path'  => normalizeDocumentPath($r['path'], $clientSlug),
+                    'codes' => $r['codes'] ? explode("\n", $r['codes']) : [],
+                ];
+            },
+            $rows
+        );
+
+        echo json_encode([
+            'total'     => $total,
+            'page'      => $page,
+            'per_page'  => $perPage,
+            'last_page' => $lastPage,
+            'data'      => $docs,
+        ]);
+        break;
+
+    case 'search':
+        $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
+        if (empty($codes)) {
+            echo json_encode([]);
+            break;
+        }
+
+        $placeholders = implode(' OR ', array_fill(0, count($codes), 'UPPER(c.code) = UPPER(?)'));
+        $stmt = $db->prepare(
+            "SELECT d.id, d.name, d.date, d.path, c.code
+             FROM documents d
+             JOIN codes c ON d.id = c.document_id
+             WHERE $placeholders"
+        );
+        $stmt->execute($codes);
+        $rows = $stmt->fetchAll();
+
+        $docs = [];
+        foreach ($rows as $r) {
+            $id = (int)$r['id'];
+            if (!isset($docs[$id])) {
+                $docs[$id] = [
+                    'id'    => $id,
+                    'name'  => $r['name'],
+                    'date'  => $r['date'],
+                    'path'  => normalizeDocumentPath($r['path'], $clientSlug),
+                    'codes' => [],
+                ];
+            }
+            if (!in_array($r['code'], $docs[$id]['codes'], true)) {
+                $docs[$id]['codes'][] = $r['code'];
+            }
+        }
+
+        $remaining = $codes;
+        $selected  = [];
+        while ($remaining) {
+            $best = null;
+            $bestCover = [];
+            foreach ($docs as $d) {
+                $cover = array_intersect($d['codes'], $remaining);
+                if (!$best
+                    || count($cover) > count($bestCover)
+                    || (count($cover) === count($bestCover) && $d['date'] > $best['date'])
+                ) {
+                    $best      = $d;
+                    $bestCover = $cover;
+                }
+            }
+            if (!$best || empty($bestCover)) {
+                break;
+            }
+            $selected[] = $best;
+            $remaining = array_diff($remaining, $bestCover);
+            unset($docs[$best['id']]);
+        }
+
+        echo json_encode(array_values($selected));
+        break;
+
+    case 'download_pdfs':
+        $uploadsDir = $clientUploadsDir;
+        if (!is_dir($uploadsDir)) {
+            respondError('Carpeta uploads del cliente no encontrada', 404);
+        }
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'zip');
+        $zip = new ZipArchive();
+        if ($zip->open($tmpFile, ZipArchive::CREATE) !== true) {
+            respondError('No se pudo crear el ZIP', 500);
+        }
+
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($uploadsDir, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::LEAVES_ONLY
+        );
+        foreach ($files as $file) {
+            if (!$file->isDir()) {
+                $filePath     = $file->getRealPath();
+                $relativePath = substr($filePath, strlen($uploadsDir) + 1);
+                $zip->addFile($filePath, $relativePath);
+            }
+        }
+        $zip->close();
+
+        header('Content-Type: application/zip');
+        header('Content-Disposition: attachment; filename="uploads_' . $clientSlug . '_' . date('Ymd_His') . '.zip"');
+
+        readfile($tmpFile);
+        unlink($tmpFile);
+        exit;
+
+    case 'edit':
+        $id   = (int)($_POST['id'] ?? 0);
+        $name = $_POST['name'] ?? '';
+        $date = $_POST['date'] ?? '';
+        $codes = array_filter(array_map('trim', preg_split('/\r?\n/', $_POST['codes'] ?? '')));
+
+        if (!$id || !$name || !$date) {
+            respondError('Faltan campos obligatorios', 400);
+        }
+
+        if (!empty($_FILES['file']['tmp_name'])) {
+            $old = $db->prepare('SELECT path FROM documents WHERE id = ?');
+            $old->execute([$id]);
+            $oldPath = $old->fetchColumn();
+            if ($oldPath) {
+                $fullOldPath = resolveUploadFullPath((string)$oldPath, $clientSlug);
+                if ($fullOldPath) {
+                    @unlink($fullOldPath);
+                }
+            }
+            $filename   = time() . '_' . basename($_FILES['file']['name']);
+            $storedPath = buildStoredUploadPath($filename, $clientSlug);
+            $fullPath   = __DIR__ . '/' . $storedPath;
+            if (!move_uploaded_file($_FILES['file']['tmp_name'], $fullPath)) {
+                respondError('No se pudo subir el PDF actualizado', 500);
+            }
+            $db->prepare('UPDATE documents SET name = ?, date = ?, path = ? WHERE id = ?')
+               ->execute([$name, $date, $storedPath, $id]);
+        } else {
+            $db->prepare('UPDATE documents SET name = ?, date = ? WHERE id = ?')
+               ->execute([$name, $date, $id]);
+        }
+
+        $db->prepare('DELETE FROM codes WHERE document_id = ?')->execute([$id]);
+        $ins = $db->prepare('INSERT INTO codes (document_id, code) VALUES (?, ?)');
+        foreach (array_unique($codes) as $c) {
+            $ins->execute([$id, $c]);
+        }
+        echo json_encode(['message' => 'Documento actualizado']);
+        break;
+
+    case 'delete':
+        $id = (int)($_GET['id'] ?? 0);
+        if (!$id) {
+            respondError('Documento no especificado', 400);
+        }
+
+        $old = $db->prepare('SELECT path FROM documents WHERE id = ?');
+        $old->execute([$id]);
+        $oldPath = $old->fetchColumn();
+        if ($oldPath) {
+            $fullPath = resolveUploadFullPath((string)$oldPath, $clientSlug);
+            if ($fullPath) {
+                @unlink($fullPath);
+            }
+        }
+        $db->prepare('DELETE FROM codes WHERE document_id = ?')->execute([$id]);
+        $db->prepare('DELETE FROM documents WHERE id = ?')->execute([$id]);
+        echo json_encode(['message' => 'Documento eliminado']);
+        break;
+
+    case 'search_by_code':
+        $code = trim($_POST['code'] ?? $_GET['code'] ?? '');
+        if ($code === '') {
+            echo json_encode([]);
+            break;
+        }
+
+        $stmt = $db->prepare(
+            'SELECT d.id, d.name, d.date, d.path, GROUP_CONCAT(c2.code SEPARATOR "\n") AS codes
+             FROM documents d
+             JOIN codes c1 ON d.id = c1.document_id
+             LEFT JOIN codes c2 ON d.id = c2.document_id
+             WHERE UPPER(c1.code) = UPPER(?)
+             GROUP BY d.id'
+        );
+        $stmt->execute([$code]);
+        $rows = $stmt->fetchAll();
+
+        $docs = array_map(
+            function (array $r) use ($clientSlug) {
+                return [
+                    'id'    => (int)$r['id'],
+                    'name'  => $r['name'],
+                    'date'  => $r['date'],
+                    'path'  => normalizeDocumentPath($r['path'], $clientSlug),
+                    'codes' => $r['codes'] ? explode("\n", $r['codes']) : [],
+                ];
+            },
+            $rows
+        );
+
+        echo json_encode($docs);
+        break;
+
+    case 'branding':
+        echo json_encode($branding);
+        break;
+
+    default:
+        echo json_encode(['error' => 'Acción inválida']);
+        break;
 }

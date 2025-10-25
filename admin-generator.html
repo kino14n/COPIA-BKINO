@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Generador de Clientes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <header class="bg-white shadow">
+    <div class="max-w-6xl mx-auto px-6 py-6 flex flex-col gap-2">
+      <h1 class="text-3xl font-bold text-slate-800">Panel de Super Administrador</h1>
+      <p class="text-slate-600">Crea, personaliza y gestiona instancias aisladas para cada cliente.</p>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8 grid gap-8 lg:grid-cols-[2fr,1fr]">
+    <section class="bg-white rounded-2xl shadow p-6 space-y-6">
+      <div>
+        <h2 class="text-2xl font-semibold text-slate-800">Crear nuevo cliente</h2>
+        <p class="text-slate-500">Completa el formulario y el sistema generará automáticamente la instancia con su configuración.</p>
+      </div>
+
+      <form id="clientForm" class="space-y-6" enctype="multipart/form-data">
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700" for="client_name">Nombre comercial</label>
+            <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="client_name" name="client_name" required placeholder="Ej: Relojería Premium" />
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-semibold text-slate-700" for="client_slug">ID para URL</label>
+            <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="client_slug" name="client_slug" required pattern="[a-z0-9-]+" placeholder="relojeria-premium" />
+            <p class="text-xs text-slate-500">Solo minúsculas, números y guiones.</p>
+          </div>
+        </div>
+
+        <fieldset class="border border-slate-200 rounded-xl p-4">
+          <legend class="px-2 text-sm font-semibold text-slate-700">Credenciales del Admin del cliente</legend>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="admin_user">Usuario</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="admin_user" name="admin_user" required placeholder="admin_cliente" />
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="admin_pass">Contraseña</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="password" id="admin_pass" name="admin_pass" required />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="border border-slate-200 rounded-xl p-4">
+          <legend class="px-2 text-sm font-semibold text-slate-700">Base de datos</legend>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="db_host">Host</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="db_host" name="db_host" required placeholder="sql.example.com" />
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="db_port">Puerto</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="number" id="db_port" name="db_port" value="3306" min="1" max="65535" />
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="db_name">Nombre de la BD</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="db_name" name="db_name" required />
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="db_user">Usuario de la BD</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="text" id="db_user" name="db_user" required />
+            </div>
+            <div class="space-y-2 md:col-span-2">
+              <label class="block text-sm font-semibold text-slate-700" for="db_pass">Contraseña de la BD</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="password" id="db_pass" name="db_pass" required />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="border border-slate-200 rounded-xl p-4">
+          <legend class="px-2 text-sm font-semibold text-slate-700">Branding</legend>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="logo">Logo (PNG / SVG)</label>
+              <input class="w-full text-sm" type="file" id="logo" name="logo" accept="image/png,image/svg+xml,image/jpeg,image/webp" required />
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="primary_color">Color primario</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="color" id="primary_color" name="primary_color" value="#F87171" />
+              <p class="text-xs text-slate-500">El hover se calculará automáticamente.</p>
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="primary_hover">Color hover (20% más oscuro)</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2 bg-slate-50" type="text" id="primary_hover" name="primary_hover" readonly />
+            </div>
+            <div class="space-y-2">
+              <label class="block text-sm font-semibold text-slate-700" for="highlighter">Servicio de resaltado PDF</label>
+              <input class="w-full border border-slate-300 rounded-lg px-3 py-2" type="url" id="highlighter" name="pdf_highlighter_url" placeholder="https://highlighter.railway.app/highlight" />
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="flex items-center gap-4">
+          <button type="submit" class="bg-slate-900 text-white px-5 py-2.5 rounded-lg font-semibold hover:bg-slate-800 transition">Generar Cliente</button>
+          <button type="button" id="resetForm" class="text-slate-600 hover:text-slate-800 text-sm">Limpiar formulario</button>
+        </div>
+      </form>
+
+      <div id="resultPanel" class="hidden border border-green-200 bg-green-50 rounded-xl p-4"></div>
+      <div id="errorPanel" class="hidden border border-red-200 bg-red-50 rounded-xl p-4 text-red-700"></div>
+    </section>
+
+    <aside class="space-y-6">
+      <section class="bg-white rounded-2xl shadow p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-semibold text-slate-800">Clientes creados</h2>
+          <button id="refreshClients" class="text-sm font-semibold text-slate-600 hover:text-slate-900">Actualizar</button>
+        </div>
+        <div id="clientList" class="space-y-4 text-sm text-slate-700">
+          <p class="text-slate-500">Aún no hay clientes registrados.</p>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-2xl shadow p-6 space-y-3 text-sm text-slate-600">
+        <h3 class="text-lg font-semibold text-slate-800">Proceso automático</h3>
+        <ol class="list-decimal list-inside space-y-2">
+          <li>Generación de carpetas /clientes, /admin, /bc, /uploads.</li>
+          <li>Creación de config.php con credenciales y branding.</li>
+          <li>Copia de plantillas base para panel admin y portal público.</li>
+          <li>Hash seguro de la contraseña del administrador.</li>
+          <li>Creación de tablas <code>documents</code> y <code>codes</code> en la BD indicada.</li>
+        </ol>
+      </section>
+    </aside>
+  </main>
+
+  <template id="clientCardTemplate">
+    <div class="border border-slate-200 rounded-xl p-4 bg-white shadow-sm space-y-3">
+      <div class="flex items-center justify-between">
+        <div>
+          <h4 class="text-lg font-semibold text-slate-800" data-field="name"></h4>
+          <p class="text-xs uppercase tracking-wide text-slate-500">ID: <span data-field="id"></span></p>
+        </div>
+        <button data-action="delete" class="text-sm font-semibold text-red-500 hover:text-red-600">Eliminar</button>
+      </div>
+      <div class="flex flex-wrap gap-2 text-sm">
+        <a data-action="admin" target="_blank" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-700">Ir a Admin</a>
+        <a data-action="public" target="_blank" class="px-3 py-1 rounded-lg bg-slate-200 text-slate-700 font-medium hover:bg-slate-300">Ver Portal Público</a>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    const form = document.getElementById('clientForm');
+    const clientNameInput = document.getElementById('client_name');
+    const slugInput = document.getElementById('client_slug');
+    const primaryInput = document.getElementById('primary_color');
+    const primaryHoverInput = document.getElementById('primary_hover');
+    const resultPanel = document.getElementById('resultPanel');
+    const errorPanel = document.getElementById('errorPanel');
+    const clientList = document.getElementById('clientList');
+    const refreshClientsBtn = document.getElementById('refreshClients');
+    const resetFormBtn = document.getElementById('resetForm');
+    const cardTemplate = document.getElementById('clientCardTemplate');
+
+    let slugEditedManually = false;
+
+    function slugify(value) {
+      return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/--+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+
+    function darken(hex, factor = 0.2) {
+      const normalized = hex.replace('#', '');
+      if (![3, 6].includes(normalized.length)) {
+        return hex;
+      }
+      const full = normalized.length === 3
+        ? normalized.split('').map((ch) => ch + ch).join('')
+        : normalized;
+      const r = parseInt(full.slice(0, 2), 16);
+      const g = parseInt(full.slice(2, 4), 16);
+      const b = parseInt(full.slice(4, 6), 16);
+      const adjust = (channel) => Math.max(0, Math.min(255, Math.round(channel * (1 - factor))));
+      const next = [adjust(r), adjust(g), adjust(b)].map((ch) => ch.toString(16).padStart(2, '0')).join('');
+      return `#${next}`;
+    }
+
+    function resetPanels() {
+      resultPanel.classList.add('hidden');
+      resultPanel.innerHTML = '';
+      errorPanel.classList.add('hidden');
+      errorPanel.textContent = '';
+    }
+
+    clientNameInput.addEventListener('input', () => {
+      if (slugEditedManually) {
+        return;
+      }
+      const generated = slugify(clientNameInput.value);
+      slugInput.value = generated;
+    });
+
+    slugInput.addEventListener('input', () => {
+      slugEditedManually = true;
+    });
+
+    primaryInput.addEventListener('input', () => {
+      primaryHoverInput.value = darken(primaryInput.value || '#000000');
+      primaryHoverInput.style.background = primaryHoverInput.value;
+      primaryHoverInput.style.color = '#fff';
+    });
+    primaryInput.dispatchEvent(new Event('input'));
+
+    resetFormBtn.addEventListener('click', () => {
+      form.reset();
+      slugEditedManually = false;
+      primaryInput.value = '#F87171';
+      primaryInput.dispatchEvent(new Event('input'));
+      resetPanels();
+    });
+
+    async function createClient(event) {
+      event.preventDefault();
+      resetPanels();
+      const formData = new FormData(form);
+      formData.set('client_slug', slugify(formData.get('client_slug')));
+      formData.set('primary_color', primaryInput.value);
+      formData.set('primary_hover', primaryHoverInput.value);
+      try {
+        const response = await fetch('client-generator.php', {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'No se pudo crear el cliente');
+        }
+        renderSuccess(data);
+        form.reset();
+        slugEditedManually = false;
+        primaryInput.value = '#F87171';
+        primaryInput.dispatchEvent(new Event('input'));
+        await loadClients();
+      } catch (error) {
+        errorPanel.textContent = error.message || 'Error desconocido';
+        errorPanel.classList.remove('hidden');
+      }
+    }
+
+    function renderSuccess(data) {
+      const info = data.client || {};
+      const admin = data.admin || {};
+      const database = data.database || {};
+      const status = data.status || {};
+      const branding = data.branding || {};
+
+      resultPanel.innerHTML = `
+        <div class="space-y-4">
+          <div>
+            <h3 class="text-lg font-semibold text-green-700">✅ Cliente "${info.name}" creado exitosamente</h3>
+          </div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div>
+              <h4 class="font-semibold text-slate-800 mb-1">🔐 Acceso Admin</h4>
+              <p class="text-sm text-slate-600">URL: <a href="${admin.url}" target="_blank" class="text-slate-900 underline">${admin.url}</a></p>
+              <p class="text-sm text-slate-600">Usuario: <span class="font-mono">${admin.user}</span></p>
+              <p class="text-sm text-slate-600">Contraseña: <span class="font-mono">${admin.password_hint}</span></p>
+            </div>
+            <div>
+              <h4 class="font-semibold text-slate-800 mb-1">🌐 Portal Público</h4>
+              <p class="text-sm text-slate-600">URL: <a href="${info.public_url}" target="_blank" class="text-slate-900 underline">${info.public_url}</a></p>
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <div>
+              <h4 class="font-semibold text-slate-800 mb-1">💾 Base de Datos</h4>
+              <ul class="text-sm text-slate-600 space-y-1">
+                <li>Host: <span class="font-mono">${database.host}</span></li>
+                <li>BD: <span class="font-mono">${database.name}</span></li>
+                <li>Usuario: <span class="font-mono">${database.user}</span></li>
+              </ul>
+            </div>
+            <div>
+              <h4 class="font-semibold text-slate-800 mb-1">📊 Estado</h4>
+              <ul class="text-sm text-slate-600 space-y-1">
+                <li>Tablas creadas: ${status.tables ? '✓' : '⚠️'}</li>
+                <li>Estructura: ${status.structure ? '✓' : '⚠️'}</li>
+                <li>Logo: ${branding.logo_saved ? '✓' : '⚠️'}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+      resultPanel.classList.remove('hidden');
+    }
+
+    async function loadClients() {
+      try {
+        const response = await fetch('client-manager.php?action=list');
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || 'No se pudo obtener la lista');
+        }
+        if (!data.clients.length) {
+          clientList.innerHTML = '<p class="text-slate-500">Aún no hay clientes registrados.</p>';
+          return;
+        }
+        clientList.innerHTML = '';
+        data.clients.forEach((client) => {
+          const fragment = document.importNode(cardTemplate.content, true);
+          fragment.querySelector('[data-field="name"]').textContent = client.name;
+          fragment.querySelector('[data-field="id"]').textContent = client.id;
+          fragment.querySelector('[data-action="admin"]').href = client.admin_url;
+          fragment.querySelector('[data-action="public"]').href = client.public_url;
+          fragment.querySelector('[data-action="delete"]').dataset.clientId = client.id;
+          clientList.appendChild(fragment);
+        });
+      } catch (error) {
+        clientList.innerHTML = `<p class="text-red-600">${error.message}</p>`;
+      }
+    }
+
+    clientList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-action="delete"]');
+      if (!button) return;
+      const clientId = button.dataset.clientId;
+      if (!clientId) return;
+      const confirmFirst = confirm(`¿Eliminar el cliente "${clientId}"?`);
+      if (!confirmFirst) return;
+      const confirmSecond = prompt('Escribe ELIMINAR para confirmar:');
+      if (confirmSecond !== 'ELIMINAR') return;
+      try {
+        const response = await fetch('client-manager.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ action: 'delete', client: clientId }),
+        });
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || 'No se pudo eliminar el cliente');
+        }
+        await loadClients();
+      } catch (error) {
+        alert(error.message || 'Error al eliminar el cliente');
+      }
+    });
+
+    refreshClientsBtn.addEventListener('click', loadClients);
+    form.addEventListener('submit', createClient);
+
+    loadClients();
+  </script>
+</body>
+</html>
